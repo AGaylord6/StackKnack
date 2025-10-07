@@ -1,0 +1,3 @@
+{:deps
+ {org.clojure/clojure {:mvn/version "1.11.1"}
+  me.raynes/conch      {:mvn/version "0.8.0"}}}
