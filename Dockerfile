@@ -9,27 +9,16 @@ RUN apt-get update && \
     apt-get install -y gdbserver && \
     apt-get clean
 
-# Build an image with gdbserver and your binary
-COPY ./test ./user_code
+# Build an image that will run gdbserver on binary that is volume mounted to container at runtime
 CMD ["gdbserver", ":1234", "./user_code"]
 
 # in wsl (to create elf instead of PE): gcc -no-pie -g -O0 test.c -o test
-
-# While running, must use --cap-add=SYS_PTRACE --security-opt seccomp=unconfined
-# docker run -it --rm -p 1234:1234 my-debug-image
-
-# docker run -it --rm \
-#   -v test.exe:./user_code \
-#   -p 1234:1234 \
-#   my-debug-image \
-#   gdbserver :1234 ./user_code
-
 
 # in container: gdbserver :1234 ./user_code
 # on host: gdb test
 # on host: (gdb) set osabi none
 # on host: (gdb) set disassembly-flavor intel
-# on host: (gdb) target remote localhost:1234
+# on host: (gdb) target remote :1234
 # Process is already running (no passing run command)
 
 

@@ -6,4 +6,6 @@ build:
 	docker build --progress=plain -f Dockerfile -t ${image_name} .
 
 run: build
-	docker run --name ${container_name} -it --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --rm -p 1234:1234 ${image_name}
+# --cap-add=SYS_PTRACE --security-opt seccomp=unconfined are needed to run gdb in container
+# -v volume mounts the user exe to the container at runtime
+	docker run --name ${container_name} -it --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --rm -v ${current_dir}/test:/stack_knack/user_code -p 1234:1234 ${image_name}
