@@ -1,0 +1,6 @@
+&"si\n"
+^running
+*running,thread-id="all"
+(gdb) 
+~"7\t    for (int i = 0; i < 10; i++) {\n"
+*stopped,reason="end-stepping-range",frame={addr="0x000000000040113c",func="main",args=[],file="test.c",fullname="/home/xavier/ND/Hackers in the Bazaar/StackKnack/test.c",line="7",arch="i386:x86-64"},thread-id="1",stopped-threads="all",core="6"

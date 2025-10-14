@@ -1,0 +1,9 @@
+&"info frame\n"
+~"Stack level 0, frame at 0x7fffffffdad0:\n"
+~" rip = 0x40113c in main (test.c:7); saved rip = 0x7ffff7de3088\n"
+~" source language c.\n"
+~" Arglist at 0x7fffffffdac0, args: \n"
+~" Locals at 0x7fffffffdac0, Previous frame's sp is 0x7fffffffdad0\n"
+~" Saved registers:\n "
+~" rbp at 0x7fffffffdac0, rip at 0x7fffffffdac8\n"
+^done

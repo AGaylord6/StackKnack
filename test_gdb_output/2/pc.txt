@@ -1,0 +1,3 @@
+&"x/i $pc\n"
+~"=> 0x40113c <main+22>:\tjmp    0x401148 <main+34>\n"
+^done

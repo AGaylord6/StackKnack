@@ -1,0 +1,4 @@
+&"bt full\n"
+~"#0  main () at test.c:6\n"
+~"        c = 32767\n"
+^done
