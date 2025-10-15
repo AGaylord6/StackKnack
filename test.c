@@ -1,11 +1,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int main() {
-    int c = 0;
-    for (int i = 0; i < 10; i++) {
-        c += i;
+void recurse(int n) {
+    printf("Recursing: %d\n", n);
+}
+
+int hi(int a) {
+    int c = a * 2;
+    for (int i = 0; i < 5; i++) {
+        recurse(i);
     }
-    printf("Hello, World! Sum is: %d\n", c);
+    return c;
+}
+
+int main() {
+    hi(5);
+    printf("Hello, World!\n");
     return 0;
 }
