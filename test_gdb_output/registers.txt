@@ -1,0 +1,24 @@
+rax            0x0                 0
+rbx            0x7ffff7dd9000      140737351835648
+rcx            0x7ffff7a05290      140737348849168
+rdx            0x7fffffffe2f8      140737488347768
+rsi            0x1                 1
+rdi            0x7fffffffe2e8      140737488347752
+rbp            0x7fffffffe1e0      0x7fffffffe1e0
+rsp            0x7fffffffe1d0      0x7fffffffe1d0
+r8             0x7ffff7fd9700      140737354018816
+r9             0x7ffff7fd9700      140737354018816
+r10            0x8                 8
+r11            0x246               582
+r12            0x555555554540      93824992233408
+r13            0x7fffffffe2f0      140737488347760
+r14            0x0                 0
+r15            0x0                 0
+rip            0x55555555467d      0x55555555467d <main+29>
+eflags         0x202               [ IF ]
+cs             0x33                51
+ss             0x2b                43
+ds             0x0                 0
+es             0x0                 0
+fs             0x0                 0
+gs             0x0                 0

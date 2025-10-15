@@ -1,0 +1,3 @@
+#0  main (argc=1, argv=0x7fffffffe2f8) at main.c:5
+#1  __libc_start_main (main=0x55555555467d, argc=1, argv=0x7fffffffe2f8, init=<optimized out>, fini=<optimized out>, rtld_fini=<optimized out>, stack_end=0x7fffffffe2e8) at ../csu/libc-start.c:314
+#2  _start () at ../sysdeps/x86_64/start.S:122
