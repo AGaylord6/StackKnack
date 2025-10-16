@@ -34,8 +34,25 @@
 
 (defn- render-stack-view [stack-data]
   (if stack-data
-    [:pre.stack-json
-     (json/generate-string stack-data {:pretty true})]
+    (let [frames (:frames stack-data)
+          highest-frame (when (seq frames) (apply max-key :index frames))
+          start-address-str (get-in highest-frame [:details :frame-address])
+          start-address (if start-address-str (Long/decode start-address-str) 0)
+          stack-memory (:stack-memory stack-data)
+          register-mappings (->> frames
+                                 (map #(get-in % [:details :saved-register-mappings]))
+                                 (reduce merge {}))]
+      [:div.stack-visualization
+       (for [i (range (count stack-memory))]
+         (let [current-address (- start-address (* i 8))
+               address-hex (format "0x%x" current-address)
+               value (get stack-memory i)
+               register-label (get register-mappings address-hex)]
+           [:div.stack-cell
+            [:div.address-label address-hex]
+            [:div.value-box value]
+            (when register-label
+              [:div.register-pointer register-label])]))])
     [:div.placeholder "Compile and step through to see stack frames and registers"]))
 
 (defn- home-page
