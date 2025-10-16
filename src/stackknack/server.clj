@@ -136,7 +136,7 @@
               (when (and msg (str/includes? (str msg) "error"))
                 [:p.msg.error msg])
              [:footer
-              [:p [:strong "Tip:"] " We call your existing ./assembler.clj under the hood to generate Intel syntax assembly."]]
+              [:p [:strong "Tip:"] " 'gcc -S -s -masm=intel code.c -o assembly.s' is called to generate stripped x86 assembly (Intel syntax)."]]
 
              ;; Minimal client-side JavaScript for form handling
              [:script "
