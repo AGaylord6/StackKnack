@@ -200,7 +200,7 @@
 
 (defn- run-gdb-step! [^String exe-path steps]
   "Run gdb_manual.clj with executable and step count"
-  (let [script "../gdb_manual.clj"
+  (let [script "src/gdb_manual.clj"
         result (shell/sh "clojure" "-M" script exe-path (str steps))]
     (if (zero? (:exit result))
       (try
