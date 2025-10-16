@@ -86,43 +86,81 @@
 
 (def ^:dynamic *current-step* 0)
 
-(defn create-single-gdb-script [total-steps]
-  "Create a single GDB script that executes steps and gathers info."
+(defn create-initial-gdb-script [total-steps]
+  "Create initial GDB script to get backtrace and registers only."
   (let [setup-commands ["set pagination off"
                         "set confirm off"
                         "set disassembly-flavor intel"
                         "set osabi none"
                         "target remote localhost:1234"]
         step-commands (repeat total-steps "si")
-        info-commands ["bt" "info registers"]
-        ;; Get frame info for up to 10 frames (more than enough usually)
-        frame-commands (map #(str "info frame " %) (range 10))
-        ;; Don't add quit - let GDB session remain connected
-        all-commands (concat setup-commands step-commands info-commands frame-commands)]
-    (str/join "\n" all-commands)))
+        info-commands ["bt" "info registers"]]
+    (str/join "\n" (concat setup-commands step-commands info-commands))))
+
+(defn create-frame-gdb-script [total-steps frame-indices]
+  "Create GDB script to get frame info for specific frames."
+  (let [setup-commands ["set pagination off"
+                        "set confirm off"
+                        "set disassembly-flavor intel"
+                        "set osabi none"
+                        "target remote localhost:1234"]
+        step-commands (repeat total-steps "si")
+        frame-commands (map #(str "info frame " %) frame-indices)]
+    (str/join "\n" (concat setup-commands step-commands frame-commands))))
 
 (defn run-gdb-to-step [exe-path steps]
-  "Run GDB to execute exactly 'steps' assembly instructions."
-  (let [script-content (create-single-gdb-script steps)
-        script-file (java.io.File/createTempFile "gdb-docker" ".txt")]
+  "Run GDB to execute exactly 'steps' assembly instructions with dynamic frame detection."
+  ;; First pass: get backtrace and registers to count frames
+  (let [initial-script (create-initial-gdb-script steps)
+        initial-script-file (java.io.File/createTempFile "gdb-initial" ".txt")]
     (try
-      (spit script-file script-content)
-      (let [result (shell/sh "timeout" "10s" "gdb" "--batch" "--nx"
-                             "--command" (.getAbsolutePath script-file)
-                             exe-path)]
-        (io/delete-file script-file true)
-        (if (or (= (:exit result) 0) (= (:exit result) 124)) ; 124 is timeout
-          (let [output (:out result)]
-            ;; Filter out connection errors and warnings
-            (->> (str/split-lines output)
-                 (remove #(str/includes? % "warning:"))
-                 (remove #(str/includes? % "Remote connection closed"))
-                 (str/join "\n")))
+      (spit initial-script-file initial-script)
+      (let [initial-result (shell/sh "timeout" "10s" "gdb" "--batch" "--nx"
+                                     "--command" (.getAbsolutePath initial-script-file)
+                                     exe-path)]
+        (io/delete-file initial-script-file true)
+        (if (or (= (:exit initial-result) 0) (= (:exit initial-result) 124)) ; 124 is timeout
+          (let [initial-output (:out initial-result)
+                ;; Filter and parse backtrace to count actual frames
+                clean-output (->> (str/split-lines initial-output)
+                                  (remove #(str/includes? % "warning:"))
+                                  (remove #(str/includes? % "Remote connection closed"))
+                                  (str/join "\n"))
+                bt-lines (filter #(re-matches #"#\d+.*" %) (str/split-lines clean-output))
+                frame-count (count bt-lines)
+                frame-indices (range frame-count)]
+
+            (if (> frame-count 0)
+              ;; Second pass: get frame details for existing frames only
+              (let [frame-script (create-frame-gdb-script steps frame-indices)
+                    frame-script-file (java.io.File/createTempFile "gdb-frames" ".txt")]
+                (try
+                  (spit frame-script-file frame-script)
+                  (let [frame-result (shell/sh "timeout" "10s" "gdb" "--batch" "--nx"
+                                               "--command" (.getAbsolutePath frame-script-file)
+                                               exe-path)]
+                    (io/delete-file frame-script-file true)
+                    (if (or (= (:exit frame-result) 0) (= (:exit frame-result) 124))
+                      ;; Combine both outputs
+                      (let [frame-output (->> (str/split-lines (:out frame-result))
+                                              (remove #(str/includes? % "warning:"))
+                                              (remove #(str/includes? % "Remote connection closed"))
+                                              (str/join "\n"))]
+                        (str clean-output "\n" frame-output))
+                      (do
+                        (println "GDB Frame Info Error:" (:err frame-result))
+                        clean-output))) ; Return initial output even if frame info fails
+                  (catch Exception e
+                    (io/delete-file frame-script-file true)
+                    (println "Frame Info Exception:" (.getMessage e))
+                    clean-output)))
+              ;; No frames, just return initial output
+              clean-output))
           (do
-            (println "GDB Error:" (:err result))
+            (println "GDB Error:" (:err initial-result))
             nil)))
       (catch Exception e
-        (io/delete-file script-file true)
+        (io/delete-file initial-script-file true)
         (println "Exception:" (.getMessage e))
         nil))))
 
