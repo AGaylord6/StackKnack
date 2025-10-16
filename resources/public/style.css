@@ -404,3 +404,65 @@ textarea::-webkit-scrollbar-thumb:hover,
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* New Stack Visualization Styles */
+.stack-visualization {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.5rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+.stack-cell {
+  display: grid;
+  grid-template-columns: 100px 1fr 80px;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  background-color: var(--bg-primary);
+  border-radius: 3px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+.address-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.value-box {
+  padding: 0.5rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.register-pointer {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.register-pointer[data-register^="r"],
+.register-pointer[data-register^="e"] {
+  color: var(--accent-blue);
+  background-color: #eaf2fc;
+}
+
+.register-pointer[data-register^="s"] {
+  color: var(--accent-green);
+  background-color: #e9f5ec;
+}
+
+.register-pointer[data-register^="d"] {
+  color: var(--accent-orange);
+  background-color: #fbeee6;
+}

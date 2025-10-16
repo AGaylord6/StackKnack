@@ -35,6 +35,7 @@
 (defn- render-stack-view [stack-data]
   (if stack-data
     (let [frames (:frames stack-data)
+          ;; Find highest frame to know where to start
           highest-frame (when (seq frames) (apply max-key :index frames))
           start-address-str (get-in highest-frame [:details :frame-address])
           start-address (if start-address-str (Long/decode start-address-str) 0)
@@ -44,6 +45,7 @@
                                  (reduce merge {}))]
       [:div.stack-visualization
        (for [i (range (count stack-memory))]
+          ;; Iterate over stack contents and calculate addresses
          (let [current-address (- start-address (* i 8))
                address-hex (format "0x%x" current-address)
                value (get stack-memory i)
@@ -52,7 +54,7 @@
             [:div.address-label address-hex]
             [:div.value-box value]
             (when register-label
-              [:div.register-pointer register-label])]))])
+              [:div.register-pointer {:data-register register-label} register-label])]))])
     [:div.placeholder "Compile and step through to see stack frames and registers"]))
 
 (defn- home-page
