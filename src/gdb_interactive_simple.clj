@@ -80,9 +80,7 @@
                         "set confirm off"
                         "set disassembly-flavor intel"
                         "set osabi none"
-                        "target remote :1234"
-                        "break main"
-                        "continue"]
+                        "target remote :1234"]
         step-commands (repeat current-steps "si")
         info-commands ["bt"
                        "info registers"
@@ -94,12 +92,12 @@
   (let [setup-commands ["set pagination off"
                         "set confirm off"
                         "set disassembly-flavor intel"
-                        "break main"
-                        "continue"]
+                        "target remote :1234"]
         step-commands (repeat current-steps "si")
         frame-commands (map #(str "info frame " %) frame-indices)
         cleanup-commands ["quit"]]
-    (str/join "\n" (concat setup-commands step-commands frame-commands cleanup-commands))))
+    ;; Do not add cleanup-commands here to avoid quitting GDB session
+    (str/join "\n" (concat setup-commands step-commands frame-commands))))
 
 (defn run-gdb-to-step [exe-path steps]
   "Run GDB up to a specific number of steps and return state."
