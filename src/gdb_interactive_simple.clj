@@ -79,8 +79,10 @@
   (let [setup-commands ["set pagination off"
                         "set confirm off"
                         "set disassembly-flavor intel"
+                        "set osabi none"
+                        "target remote :1234"
                         "break main"
-                        "run"]
+                        "continue"]
         step-commands (repeat current-steps "si")
         info-commands ["bt"
                        "info registers"
@@ -93,7 +95,7 @@
                         "set confirm off"
                         "set disassembly-flavor intel"
                         "break main"
-                        "run"]
+                        "continue"]
         step-commands (repeat current-steps "si")
         frame-commands (map #(str "info frame " %) frame-indices)
         cleanup-commands ["quit"]]
@@ -136,7 +138,7 @@
               ;; No frames, just return initial output
               initial-output))
           (do
-            (println "GDB Error:" (:err initial-result))
+            (println "GDB Error for " steps " steps:" (:err initial-result))
             nil)))
       (catch Exception e
         (io/delete-file initial-script-file true)
