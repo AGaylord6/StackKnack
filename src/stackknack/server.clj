@@ -136,7 +136,7 @@
               (when (and msg (str/includes? (str msg) "error"))
                 [:p.msg.error msg])
              [:footer
-              [:p [:strong "Tip:"] " 'gcc -S -s -masm=intel code.c -o assembly.s' is called to generate stripped x86 assembly (Intel syntax)."]]
+              [:p [:strong "Tip:"] " x64 assembly is generated with 'gcc -S -fno-asynchronous-unwind-tables -fno-dwarf2-cfi-asm -fno-unwind-tables -g0 -masm=intel code.c -o assembly.s'"]]
 
              ;; Minimal client-side JavaScript for form handling
              [:script "
