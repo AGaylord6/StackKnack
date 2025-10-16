@@ -74,72 +74,55 @@
 (def ^:dynamic *step-count* 0)
 (def ^:dynamic *registers* {})
 
-(defn generate-initial-gdb-script [current-steps]
-  "Generate initial GDB script to get backtrace and registers only."
+(defn generate-gdb-commands [current-steps]
+  "Generate GDB commands for current step without session termination."
+  (let [step-commands (repeat current-steps "si")
+        info-commands ["bt" "info registers"]]
+    (concat step-commands info-commands)))
+
+(defn generate-frame-commands [frame-indices]
+  "Generate frame info commands without session management."
+  (map #(str "info frame " %) frame-indices))
+
+(def ^:dynamic *current-step* 0)
+
+(defn create-single-gdb-script [total-steps]
+  "Create a single GDB script that executes steps and gathers info."
   (let [setup-commands ["set pagination off"
                         "set confirm off"
                         "set disassembly-flavor intel"
                         "set osabi none"
-                        "target remote :1234"]
-        step-commands (repeat current-steps "si")
-        info-commands ["bt"
-                       "info registers"
-                       "quit"]]
-    (str/join "\n" (concat setup-commands step-commands info-commands))))
-
-(defn generate-frame-info-script [current-steps frame-indices]
-  "Generate GDB script to get frame info for specific frames."
-  (let [setup-commands ["set pagination off"
-                        "set confirm off"
-                        "set disassembly-flavor intel"
-                        "target remote :1234"]
-        step-commands (repeat current-steps "si")
-        frame-commands (map #(str "info frame " %) frame-indices)
-        cleanup-commands ["quit"]]
-    ;; Do not add cleanup-commands here to avoid quitting GDB session
-    (str/join "\n" (concat setup-commands step-commands frame-commands))))
+                        "target remote localhost:1234"]
+        step-commands (repeat total-steps "si")
+        info-commands ["bt" "info registers"]
+        ;; Get frame info for up to 10 frames (more than enough usually)
+        frame-commands (map #(str "info frame " %) (range 10))
+        ;; Don't add quit - let GDB session remain connected
+        all-commands (concat setup-commands step-commands info-commands frame-commands)]
+    (str/join "\n" all-commands)))
 
 (defn run-gdb-to-step [exe-path steps]
-  "Run GDB up to a specific number of steps and return state."
-  ;; First pass: get backtrace and registers
-  (let [initial-script (generate-initial-gdb-script steps)
-        initial-script-file (java.io.File/createTempFile "gdb-initial" ".txt")]
+  "Run GDB to execute exactly 'steps' assembly instructions."
+  (let [script-content (create-single-gdb-script steps)
+        script-file (java.io.File/createTempFile "gdb-docker" ".txt")]
     (try
-      (spit initial-script-file initial-script)
-      (let [initial-result (shell/sh "gdb" "--batch" "--nx" "--command" (.getAbsolutePath initial-script-file) exe-path)]
-        (io/delete-file initial-script-file true)
-        (if (= (:exit initial-result) 0)
-          (let [initial-output (:out initial-result)
-                ;; Parse backtrace to count frames
-                bt-lines (filter #(re-matches #"#\d+.*" %) (str/split-lines initial-output))
-                frame-count (count bt-lines)
-                frame-indices (range frame-count)]
-
-            (if (> frame-count 0)
-              ;; Second pass: get frame details for existing frames only
-              (let [frame-script (generate-frame-info-script steps frame-indices)
-                    frame-script-file (java.io.File/createTempFile "gdb-frames" ".txt")]
-                (try
-                  (spit frame-script-file frame-script)
-                  (let [frame-result (shell/sh "gdb" "--batch" "--nx" "--command" (.getAbsolutePath frame-script-file) exe-path)]
-                    (io/delete-file frame-script-file true)
-                    (if (= (:exit frame-result) 0)
-                      ;; Combine both outputs
-                      (str initial-output "\n" (:out frame-result))
-                      (do
-                        (println "GDB Frame Info Error:" (:err frame-result))
-                        initial-output))) ; Return initial output even if frame info fails
-                  (catch Exception e
-                    (io/delete-file frame-script-file true)
-                    (println "Frame Info Exception:" (.getMessage e))
-                    initial-output)))
-              ;; No frames, just return initial output
-              initial-output))
+      (spit script-file script-content)
+      (let [result (shell/sh "timeout" "10s" "gdb" "--batch" "--nx"
+                             "--command" (.getAbsolutePath script-file)
+                             exe-path)]
+        (io/delete-file script-file true)
+        (if (or (= (:exit result) 0) (= (:exit result) 124)) ; 124 is timeout
+          (let [output (:out result)]
+            ;; Filter out connection errors and warnings
+            (->> (str/split-lines output)
+                 (remove #(str/includes? % "warning:"))
+                 (remove #(str/includes? % "Remote connection closed"))
+                 (str/join "\n")))
           (do
-            (println "GDB Error for " steps " steps:" (:err initial-result))
+            (println "GDB Error:" (:err result))
             nil)))
       (catch Exception e
-        (io/delete-file initial-script-file true)
+        (io/delete-file script-file true)
         (println "Exception:" (.getMessage e))
         nil))))
 
@@ -185,12 +168,14 @@
   (println (str "\n=== Step " step-num " ==="))
   (println (json/generate-string state {:pretty true})))
 
+
+
 (defn interactive-loop [exe-path]
   "Run the interactive stepping loop."
   (println (str "Interactive GDB Stepper for: " exe-path))
   (println "Commands:")
   (println "  si    - Step one assembly instruction")
-  (println "  quit  - Exit")
+  (println "  quit  - Exit (leaves Docker container running)")
   (println "  help  - Show help")
 
   ;; Show initial state (step 0)
@@ -205,13 +190,13 @@
     (let [input (str/trim (read-line))]
       (cond
         (= input "quit")
-        (println "Goodbye!")
+        (println "Goodbye! (Docker container remains running)")
 
         (= input "help")
         (do
           (println "Commands:")
           (println "  si    - Step one assembly instruction")
-          (println "  quit  - Exit")
+          (println "  quit  - Exit (leaves Docker container running)")
           (println "  help  - Show help")
           (recur step-count))
 
