@@ -70,8 +70,8 @@
 (defn- home-page
   ([] (home-page nil nil nil nil nil nil))
   ([c-src asm-out msg session-id step-count stack-data]
-   (let [code-changed? (and session-id 
-                           c-src 
+   (let [code-changed? (and session-id
+                           c-src
                            (not= c-src (get-in @sessions [session-id :c-code])))]
      (layout "StackKnack — C→Assembly"
              [:header
@@ -84,9 +84,9 @@
                [:div.cols
                 [:div.col
                  [:label {:for "code"} "C Source Code"]
-                 [:textarea {:name "code" 
-                            :id "code" 
-                            :wrap "off" 
+                 [:textarea {:name "code"
+                            :id "code"
+                            :wrap "off"
                             :spellcheck "false"
                             :placeholder "Enter your C code here..."
                             :autocomplete "off"
@@ -95,9 +95,9 @@
                   (or c-src "#include <stdio.h>\n\nint add(int a, int b) {\n  return a + b;\n}\n\nint main() {\n  int x = add(2, 40);\n  printf(\"%d\\n\", x);\n  return 0;\n}\n")]]
                 [:div.col
                  [:label {:for "asm"} "Assembly Output (.s)"]
-                 [:textarea {:id "asm" 
+                 [:textarea {:id "asm"
                             :name "asm"
-                            :readonly true 
+                            :readonly true
                             :wrap "off"
                             :placeholder "// Assembly output will appear here after compilation"}
                   (or asm-out "")]]
@@ -107,23 +107,23 @@
                   (render-stack-view stack-data)]]]
                [:div.actions
                 [:div.action-column
-                 [:button {:type "submit" 
-                          :name "action" 
+                 [:button {:type "submit"
+                          :name "action"
                           :value "compile"
-                          :id "compile-btn"} 
+                          :id "compile-btn"}
                   "Compile to Assembly"]
-                 (when msg 
-                   [:div.status-indicator 
+                 (when msg
+                   [:div.status-indicator
                     (if (str/includes? (str msg) "error")
                       [:span.error msg]
                       [:span msg])])]
                 [:div.action-column
                  (when (and session-id asm-out (not code-changed?))
-                   [:button {:type "submit" 
-                            :name "action" 
+                   [:button {:type "submit"
+                            :name "action"
                             :value "step"
-                            :id "step-btn" 
-                            :class "step-btn"} 
+                            :id "step-btn"
+                            :class "step-btn"}
                     (str "Step Instruction (" (or step-count 0) ")")])
                  (when code-changed?
                    [:button {:type "submit"
@@ -137,7 +137,7 @@
                 [:p.msg.error msg])
              [:footer
               [:p [:strong "Tip:"] " We call your existing ./assembler.clj under the hood to generate Intel syntax assembly."]]
-             
+
              ;; Minimal client-side JavaScript for form handling
              [:script "
                document.getElementById('main-form').addEventListener('submit', function(e) {
@@ -156,7 +156,7 @@
                    }
                  }
                });
-               
+
                // Keyboard shortcuts
                document.addEventListener('keydown', function(e) {
                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -231,7 +231,7 @@
                 (swap! sessions assoc session-id {:exe-path exe-path
                                                    :step-count 0
                                                    :c-code code}))
-              {:asm (slurp s-path) 
+              {:asm (slurp s-path)
                :log stdout
                :session-id session-id})
             {:error (str "Compilation failed:\n\n" (or stderr stdout))}))
@@ -252,16 +252,16 @@
 
 (defn handler [req]
   (case [(:request-method req) (:uri req)]
-    [:get "/"] 
+    [:get "/"]
     (home-page)
-    
+
     [:post "/compile"]
     (let [code (get-in req [:params "code"])
           {:keys [asm log error session-id]} (c-to-asm code)]
       (if error
         (home-page code nil error nil nil nil)
         (home-page code asm "Compiled successfully!" session-id 0 nil)))
-    
+
     [:post "/step"]
     (let [session-id (get-in req [:params "session-id"])
           code (get-in req [:params "code"])
@@ -276,12 +276,12 @@
         ;; Step
         (let [result (step-execution session-id)]
           (if (:error result)
-            (home-page code asm (:error result) session-id 
+            (home-page code asm (:error result) session-id
                       (get-in @sessions [session-id :step-count]) nil)
-            (home-page code asm nil session-id 
+            (home-page code asm nil session-id
                       (:step-count result) result)))))
-    
-    (layout "404 - Not Found" 
+
+    (layout "404 - Not Found"
             [:div {:style "text-align: center; padding: 4rem;"}
              [:h1 "404"]
              [:p "Page not found"]
@@ -293,7 +293,20 @@
       wrap-multipart-params
       wrap-params))
 
-(defn -main [& _]
-  (let [port (or (some-> (System/getenv "PORT") Integer/parseInt) 3000)]
-    (println (format "StackKnack server running on http://localhost:%d" port))
-    (jetty/run-jetty app {:port port :join? true})))
+(defn -main
+  "Start the StackKnack server.
+   Usage:
+     clojure -M -m stackknack.server [mode]
+   where [mode] can be:
+     - \"public\" : bind to 0.0.0.0 (accessible externally)
+     - \"local\"  : bind to localhost (default)"
+  [& [mode]]
+  (let [port (or (some-> (System/getenv "PORT") Integer/parseInt) 3000)
+        host (case (some-> mode str/lower-case)
+               "public" "0.0.0.0"
+               "local" "127.0.0.1"
+               nil     "127.0.0.1"
+               "127.0.0.1")]
+    (println (format "StackKnack server running on http://%s:%d" host port))
+    (jetty/run-jetty app {:host host :port port :join? true})))
+
