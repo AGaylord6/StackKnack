@@ -67,6 +67,24 @@
                  [(keyword reg) val])))
        (into {})))
 
+(defn parse-stack-memory [text]
+  "Parse stack memory dump output into an array of 8-byte words (strings like 0x...)."
+  (let [lines (str/split-lines text)
+        ;; Match gdb memory dump lines like:
+        ;; 0x7fffffffd1d0: 0x00007fffffffd1e0 0x00000000004005f0 ...
+        memory-lines (filter #(re-matches #"^\s*0x[0-9a-fA-F]+:.*" %) lines)]
+    (->> memory-lines
+         (mapcat (fn [line]
+                   ;; Extract all 0x... tokens on the line
+                   (let [hex-tokens (re-seq #"0x[0-9a-fA-F]+" line)]
+                     ;; First token is the line address (drop it), keep the rest (the memory words)
+                     (rest hex-tokens))))
+         (map #(let [s (subs % 2) ; drop "0x"
+                     ;; normalize to 16 hex digits (64-bit) for consistent output
+                     padded (format "%016x" (Long/parseLong s 16))]
+                 (str "0x" padded)))
+         (into []))))
+
 ;; -------------------------------
 ;; State Management
 ;; -------------------------------
@@ -84,6 +102,7 @@
         step-commands (repeat current-steps "si")
         info-commands ["bt"
                        "info registers"
+                       "info registers rsp"
                        "quit"]]
     (str/join "\n" (concat setup-commands step-commands info-commands))))
 
@@ -98,6 +117,81 @@
         frame-commands (map #(str "info frame " %) frame-indices)
         cleanup-commands ["quit"]]
     (str/join "\n" (concat setup-commands step-commands frame-commands cleanup-commands))))
+
+(defn extract-stack-addresses [output]
+  "Extract stack addresses from frame info to calculate stack memory range."
+  (let [lines (str/split-lines output)
+        ;; Find RSP (current stack pointer)
+        rsp-line (some #(re-find #"rsp\s+0x([0-9a-fA-F]+)" %) lines)
+        current-rsp (when rsp-line (str "0x" (nth rsp-line 1)))
+
+        ;; Find main's frame address by looking for the frame that contains "main"
+        ;; First find main's frame index from backtrace
+        main-frame-index (->> lines
+                              (filter #(re-matches #"#\d+.*" %))
+                              (map #(re-matches #"#(\d+).*main.*" %))
+                              (filter identity)
+                              first
+                              second)
+        ;; Then look for the detailed frame info sections and find the one at main's index
+        frame-sections (filter #(str/starts-with? % "Stack frame at") lines)
+        ;; For now, get the highest address frame (main should be at highest address)
+        all-frame-addrs (->> lines
+                             (keep #(re-find #"Stack frame at (0x[0-9a-fA-F]+)" %))
+                             (map #(nth % 1))
+                             (map #(Long/parseLong (subs % 2) 16))
+                             (sort >)) ; Sort descending
+        main-frame-addr (when (seq all-frame-addrs)
+                          (format "0x%x" (first all-frame-addrs)))]
+    {:current-rsp current-rsp
+     :main-frame-addr main-frame-addr}))(defn calculate-stack-size [rsp-addr main-frame-addr]
+  "Calculate number of bytes between current RSP and main's frame address."
+  (when (and rsp-addr main-frame-addr)
+    (let [rsp-val (Long/parseLong (subs rsp-addr 2) 16)
+          main-val (Long/parseLong (subs main-frame-addr 2) 16)]
+      ;; Stack grows downward: main frame is at highest address, RSP gets lower as stack grows
+      (if (> main-val rsp-val)
+        (- main-val rsp-val)
+        256)))) ; Default size if calculation seems wrong
+
+(defn generate-stack-dump-script [current-steps stack-info]
+  "Generate GDB script to dump stack memory from RSP to main's frame address."
+  (let [setup-commands ["set pagination off"
+                        "set confirm off"
+                        "set disassembly-flavor intel"
+                        "break main"
+                        "run"]
+        step-commands (repeat current-steps "si")
+        ;; Calculate exact bytes from RSP to main's frame address (stack bottom)
+        stack-size (if (and (:current-rsp stack-info) (:main-frame-addr stack-info))
+                     (calculate-stack-size (:current-rsp stack-info) (:main-frame-addr stack-info))
+                     256) ; Fallback
+        ;; Allow larger stack dumps to capture full frames
+        capped-size (min stack-size 2048)
+        word-count (max 1 (quot (+ capped-size 7) 8)) ; number of 8-byte words
+        ;; Use 'gx' to print 8-byte (64-bit) words directly
+        dump-command [(str "x/" word-count "gx $rsp")]
+        cleanup-commands ["quit"]]
+    (str/join "\n" (concat setup-commands step-commands dump-command cleanup-commands))))
+
+(defn get-stack-memory [exe-path steps combined-output]
+  "Get stack memory dump based on frame information."
+  (let [stack-info (extract-stack-addresses combined-output)
+        stack-script (generate-stack-dump-script steps stack-info)
+        stack-script-file (java.io.File/createTempFile "gdb-stack" ".txt")]
+    (try
+      (spit stack-script-file stack-script)
+      (let [stack-result (shell/sh "gdb" "--batch" "--nx" "--command" (.getAbsolutePath stack-script-file) exe-path)]
+        (io/delete-file stack-script-file true)
+        (if (= (:exit stack-result) 0)
+          (:out stack-result)
+          (do
+            (println "GDB Stack Dump Error:" (:err stack-result))
+            ""))) ; Return empty string on error
+      (catch Exception e
+        (io/delete-file stack-script-file true)
+        (println "Stack Dump Exception:" (.getMessage e))
+        ""))))
 
 (defn run-gdb-to-step [exe-path steps]
   "Run GDB up to a specific number of steps and return state."
@@ -124,8 +218,10 @@
                   (let [frame-result (shell/sh "gdb" "--batch" "--nx" "--command" (.getAbsolutePath frame-script-file) exe-path)]
                     (io/delete-file frame-script-file true)
                     (if (= (:exit frame-result) 0)
-                      ;; Combine both outputs
-                      (str initial-output "\n" (:out frame-result))
+                      ;; Third pass: get stack memory dump
+                      (let [combined-output (str initial-output "\n" (:out frame-result))
+                            stack-output (get-stack-memory exe-path steps combined-output)]
+                        (str combined-output "\n" stack-output))
                       (do
                         (println "GDB Frame Info Error:" (:err frame-result))
                         initial-output))) ; Return initial output even if frame info fails
@@ -157,8 +253,14 @@
         reg-text (str/join "\n" reg-lines)
         registers (parse-registers reg-text)
 
-        ;; Parse frame details - extract individual "Stack frame at" sections
-        frame-sections (re-seq #"Stack frame at[^\n]*(?:\n[^\n]*)*?(?=\nStack frame at|\n$|$)" output)
+        ;; Parse stack memory dump
+        stack-memory (parse-stack-memory output)
+
+        ;; Parse frame details - extract individual "Stack frame at" sections (but exclude stack memory dump)
+        clean-output-for-frames (->> (str/split-lines output)
+                                     (take-while #(not (re-matches #"0x[0-9a-fA-F]+:[\s\t]+.*0x[0-9a-fA-F]+.*" %)))
+                                     (str/join "\n"))
+        frame-sections (re-seq #"Stack frame at[^\n]*(?:\n[^\n]*)*?(?=\nStack frame at|\n$|$)" clean-output-for-frames)
         detailed-frames
         (map-indexed (fn [idx frame]
                        (let [frame-text (if (< idx (count frame-sections))
@@ -174,7 +276,8 @@
     (alter-var-root #'*registers* (constantly registers))
 
     {:frame-count (count frames)
-     :frames detailed-frames}))
+     :frames detailed-frames
+     :stack-memory stack-memory}))
 
 ;; -------------------------------
 ;; Interactive Interface
