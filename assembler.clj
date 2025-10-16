@@ -21,9 +21,7 @@
           asm-file (str (str/replace source-file #"\.c$" "") ".s")
           ;; Run gcc with -S to produce assembly
           ;; -g adds debug info
-          result (shell/sh "gcc" "-S" "-masm=intel" source-file "-o" asm-file)]
-
-          ;; TODO: create 1 version with debugging info (cfi_ directives) and one without for displaying clean asm
+          result (shell/sh "gcc" "-S" "-fno-asynchronous-unwind-tables" "-fno-dwarf2-cfi-asm" "-fno-unwind-tables" "-g0" "-masm=intel" source-file "-o" asm-file)]
 
       (if (zero? (:exit result))
         (println "Assembly generated at:" asm-file)
