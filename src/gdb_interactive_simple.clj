@@ -74,8 +74,8 @@
 (def ^:dynamic *step-count* 0)
 (def ^:dynamic *registers* {})
 
-(defn generate-gdb-script [current-steps]
-  "Generate a GDB script for current step count."
+(defn generate-initial-gdb-script [current-steps]
+  "Generate initial GDB script to get backtrace and registers only."
   (let [setup-commands ["set pagination off"
                         "set confirm off"
                         "set disassembly-flavor intel"
@@ -84,27 +84,62 @@
         step-commands (repeat current-steps "si")
         info-commands ["bt"
                        "info registers"
-                       "info frame 0"
-                       "info frame 1"
-                       "info frame 2"
                        "quit"]]
     (str/join "\n" (concat setup-commands step-commands info-commands))))
 
+(defn generate-frame-info-script [current-steps frame-indices]
+  "Generate GDB script to get frame info for specific frames."
+  (let [setup-commands ["set pagination off"
+                        "set confirm off"
+                        "set disassembly-flavor intel"
+                        "break main"
+                        "run"]
+        step-commands (repeat current-steps "si")
+        frame-commands (map #(str "info frame " %) frame-indices)
+        cleanup-commands ["quit"]]
+    (str/join "\n" (concat setup-commands step-commands frame-commands cleanup-commands))))
+
 (defn run-gdb-to-step [exe-path steps]
   "Run GDB up to a specific number of steps and return state."
-  (let [script (generate-gdb-script steps)
-        script-file (java.io.File/createTempFile "gdb-step" ".txt")]
+  ;; First pass: get backtrace and registers
+  (let [initial-script (generate-initial-gdb-script steps)
+        initial-script-file (java.io.File/createTempFile "gdb-initial" ".txt")]
     (try
-      (spit script-file script)
-      (let [result (shell/sh "gdb" "--batch" "--nx" "--command" (.getAbsolutePath script-file) exe-path)]
-        (io/delete-file script-file true)
-        (if (= (:exit result) 0)
-          (:out result)
+      (spit initial-script-file initial-script)
+      (let [initial-result (shell/sh "gdb" "--batch" "--nx" "--command" (.getAbsolutePath initial-script-file) exe-path)]
+        (io/delete-file initial-script-file true)
+        (if (= (:exit initial-result) 0)
+          (let [initial-output (:out initial-result)
+                ;; Parse backtrace to count frames
+                bt-lines (filter #(re-matches #"#\d+.*" %) (str/split-lines initial-output))
+                frame-count (count bt-lines)
+                frame-indices (range frame-count)]
+
+            (if (> frame-count 0)
+              ;; Second pass: get frame details for existing frames only
+              (let [frame-script (generate-frame-info-script steps frame-indices)
+                    frame-script-file (java.io.File/createTempFile "gdb-frames" ".txt")]
+                (try
+                  (spit frame-script-file frame-script)
+                  (let [frame-result (shell/sh "gdb" "--batch" "--nx" "--command" (.getAbsolutePath frame-script-file) exe-path)]
+                    (io/delete-file frame-script-file true)
+                    (if (= (:exit frame-result) 0)
+                      ;; Combine both outputs
+                      (str initial-output "\n" (:out frame-result))
+                      (do
+                        (println "GDB Frame Info Error:" (:err frame-result))
+                        initial-output))) ; Return initial output even if frame info fails
+                  (catch Exception e
+                    (io/delete-file frame-script-file true)
+                    (println "Frame Info Exception:" (.getMessage e))
+                    initial-output)))
+              ;; No frames, just return initial output
+              initial-output))
           (do
-            (println "GDB Error:" (:err result))
+            (println "GDB Error:" (:err initial-result))
             nil)))
       (catch Exception e
-        (io/delete-file script-file true)
+        (io/delete-file initial-script-file true)
         (println "Exception:" (.getMessage e))
         nil))))
 
