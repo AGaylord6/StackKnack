@@ -491,3 +491,22 @@ textarea::-webkit-scrollbar-thumb:hover,
   color: var(--accent-orange);
   background-color: #fbeee6;
 }
+
+.error-placeholder {
+  color: var(--accent-red);
+  background-color: #ffebe9;
+  border: 1px solid var(--accent-red);
+  padding: 1rem;
+  text-align: left;
+  opacity: 1;
+}
+
+.error-placeholder h4 {
+  margin-bottom: 0.5rem;
+}
+
+.error-placeholder pre {
+  white-space: pre-wrap;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}

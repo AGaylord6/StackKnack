@@ -34,46 +34,55 @@
 
 (defn- render-stack-view [stack-data]
   (if stack-data
-    (let [frames (:frames stack-data)
-          stack-memory (:stack-memory stack-data)
-          ;; 1. Pre-process frames: parse addresses and sort from high to low memory
-          sorted-frames (->> frames
-                             (map #(assoc % :address (Long/decode (get-in % [:details :frame-address]))))
-                             (sort-by :address #(> %1 %2)))
-          register-mappings (->> frames
-                                 (map #(get-in % [:details :saved-register-mappings]))
-                                 (reduce merge {}))
-          start-address (-> sorted-frames first :address)]
+    (try
+      (let [frames (not-empty (:frames stack-data))
+            stack-memory (not-empty (:stack-memory stack-data))]
+        (if (and frames stack-memory)
+          (let [;; 1. Pre-process frames: parse addresses and sort from high to low memory
+                sorted-frames (->> frames
+                                   (map #(assoc % :address (some-> (get-in % [:details :frame-address]) Long/decode)))
+                                   (filter :address)
+                                   (sort-by :address (comparator >)))
+                register-mappings (->> frames
+                                       (map #(get-in % [:details :saved-register-mappings]))
+                                       (reduce merge {}))
+                start-address (-> sorted-frames first :address)]
 
-      (if (or (empty? sorted-frames) (nil? start-address))
-        [:div.placeholder "Could not determine stack layout."]
-        [:div.stack-visualization
-         ;; 2. Iterate through the sorted frames to render them in order
-         (for [i (range (count sorted-frames))]
-           (let [current-frame (get sorted-frames i)
-                 next-frame (get sorted-frames (inc i) nil)
-                 frame-start-addr (:address current-frame)
-                 ;; A frame ends where the next one begins. The last frame has no end boundary.
-                 frame-end-addr (when next-frame (:address next-frame))
-                 ;; 3. Filter stack cells that belong to the current frame
-                 cells-in-frame (->> (map-indexed vector stack-memory)
-                                     (filter (fn [[idx _]]
-                                               (let [cell-addr (- start-address (* idx 8))]
-                                                 (if frame-end-addr
-                                                   (and (>= cell-addr frame-end-addr) (< cell-addr frame-start-addr))
-                                                   ;; For the last frame, include all remaining cells
-                                                   (<= cell-addr frame-start-addr))))))]
-             [:div.stack-frame-group
-              [:div.frame-label (:function current-frame)]
-              (for [[idx value] cells-in-frame]
-                (let [current-address (- start-address (* idx 8))
-                      address-hex (format "0x%x" current-address)
-                      register-label (get register-mappings address-hex)]
-                  [:div.stack-cell
-                   [:div.address-label address-hex]
-                   [:div.value-box value]
-                   [:div.register-pointer {:data-register (or register-label "")}
-                    (when register-label register-label)]]))]))]))
+            (if (or (empty? sorted-frames) (nil? start-address))
+              [:div.placeholder "Could not determine stack layout."]
+              [:div.stack-visualization
+               ;; 2. Iterate through the sorted frames to render them in order
+               (for [i (range (count sorted-frames))]
+                 (let [current-frame (get sorted-frames i)
+                       next-frame (get sorted-frames (inc i) nil)
+                       frame-start-addr (:address current-frame)
+                       ;; A frame ends where the next one begins. The last frame has no end boundary.
+                       frame-end-addr (when next-frame (:address next-frame))
+                       ;; 3. Filter stack cells that belong to the current frame
+                       cells-in-frame (->> (map-indexed vector stack-memory)
+                                           (filter (fn [[idx _]]
+                                                     (let [cell-addr (- start-address (* idx 8))]
+                                                       (if frame-end-addr
+                                                         (and (>= cell-addr frame-end-addr) (< cell-addr frame-start-addr))
+                                                         ;; For the last frame, include all remaining cells
+                                                         (<= cell-addr frame-start-addr))))))]
+                   [:div.stack-frame-group
+                    [:div.frame-label (:function current-frame)]
+                    (for [[idx value] cells-in-frame]
+                      (let [current-address (- start-address (* idx 8))
+                            address-hex (format "0x%x" current-address)
+                            register-label (get register-mappings address-hex)]
+                        [:div.stack-cell
+                         [:div.address-label address-hex]
+                         [:div.value-box value]
+                         [:div.register-pointer {:data-register (or register-label "")}
+                          (when register-label register-label)]]))]))]))
+          [:div.placeholder "No stack data available to display."]))
+      (catch Exception e
+        [:div.placeholder.error-placeholder
+         [:h4 "Error Rendering Stack"]
+         [:p "There was an issue displaying the stack visualization."]
+         [:pre (with-out-str (clojure.stacktrace/print-stack-trace e))]]))
     [:div.placeholder "Compile and step through to see stack frames and registers"]))
 
 (defn- home-page
