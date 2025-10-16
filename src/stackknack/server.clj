@@ -10,7 +10,8 @@
     [ring.middleware.multipart-params :refer [wrap-multipart-params]]
     [me.raynes.conch.low-level :as conch]
     [cheshire.core :as json]
-    [gdb-manual :as gdb])
+    [gdb-manual :as gdb]
+    [clojure.stacktrace :as stacktrace])
   (:import (java.util UUID)))
 
 ;; -------------------------------
