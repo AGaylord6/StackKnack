@@ -1,6 +1,6 @@
 #!/usr/bin/env -S clojure -M
 
-(ns gdb-interactive-simple
+(ns gdb-manual
   (:require [clojure.string :as str]
             [cheshire.core :as json]
             [clojure.java.shell :as shell]

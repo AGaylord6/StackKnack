@@ -9,53 +9,18 @@
     [ring.middleware.params :refer [wrap-params]]
     [ring.middleware.multipart-params :refer [wrap-multipart-params]]
     [me.raynes.conch.low-level :as conch]
-    [cheshire.core :as json])
-  (:import
-    (java.util UUID)))
+    [cheshire.core :as json]
+    [gdb-manual :as gdb])
+  (:import (java.util UUID)))
 
-;; Store session state for debugging
+;; -------------------------------
+;; Session State
+;; -------------------------------
 (def sessions (atom {}))
 
-(defn- render-register [reg val]
-  [:div.reg-item
-   [:span.reg-name (name reg)]
-   [:span.reg-value val]])
-
-(defn- render-registers [registers]
-  (when (seq registers)
-    [:div.section
-     [:h3 "Registers"]
-     [:div.registers
-      (for [[reg val] registers]
-        (render-register reg val))]]))
-
-(defn- render-frame [frame]
-  [:div.frame
-   [:div.frame-header
-    (str "#" (:index frame) " " (:function frame))
-    (when (and (:file frame) (:line frame))
-      [:span.frame-loc (str " at " (:file frame) ":" (:line frame))])]
-   (when (seq (:args frame))
-     [:div.frame-args
-      [:strong "Args: "]
-      (str/join ", " (map #(str (:name %) "=" (:value %)) (:args frame)))])
-   (when-let [frame-addr (get-in frame [:details :frameAddress])]
-     [:div.frame-detail (str "Frame: " frame-addr)])])
-
-(defn- render-frames [frames frame-count]
-  (when (seq frames)
-    [:div.section
-     [:h3 (str "Stack Frames (" frame-count ")")]
-     (for [frame frames]
-       (render-frame frame))]))
-
-(defn- render-stack-view [stack-data]
-  (if stack-data
-    [:div.stack-content
-     (render-registers (:registers stack-data))
-     (render-frames (:frames stack-data) (:frameCount stack-data))]
-    [:div.placeholder "Compile and step through to see stack frames and registers"]))
-
+;; -------------------------------
+;; Rendering Helpers
+;; -------------------------------
 (defn- layout [title & body]
   {:status 200
    :headers {"Content-Type" "text/html; charset=utf-8"}
@@ -66,6 +31,12 @@
             [:title title]
             (page/include-css "/style.css")]
            [:body body])})
+
+(defn- render-stack-view [stack-data]
+  (if stack-data
+    [:pre.stack-json
+     (json/generate-string stack-data {:pretty true})]
+    [:div.placeholder "Compile and step through to see stack frames and registers"]))
 
 (defn- home-page
   ([] (home-page nil nil nil nil nil nil))
@@ -138,41 +109,27 @@
              [:footer
               [:p [:strong "Tip:"] " x64 assembly is generated with 'gcc -S -fno-asynchronous-unwind-tables -fno-dwarf2-cfi-asm -fno-unwind-tables -g0 -masm=intel code.c -o assembly.s'"]]
 
-             ;; Minimal client-side JavaScript for form handling
              [:script "
                document.getElementById('main-form').addEventListener('submit', function(e) {
                  const action = document.activeElement.value;
                  if (action === 'compile') {
                    const compileBtn = document.getElementById('compile-btn');
-                   if (compileBtn) {
-                     compileBtn.disabled = true;
-                     compileBtn.textContent = 'Compiling...';
-                   }
+                   if (compileBtn) { compileBtn.disabled = true; compileBtn.textContent = 'Compiling...'; }
                  } else if (action === 'step') {
                    const stepBtn = document.getElementById('step-btn');
-                   if (stepBtn) {
-                     stepBtn.disabled = true;
-                     stepBtn.textContent = 'Stepping...';
-                   }
+                   if (stepBtn) { stepBtn.disabled = true; stepBtn.textContent = 'Stepping...'; }
                  }
                });
 
-               // Keyboard shortcuts
                document.addEventListener('keydown', function(e) {
-                 if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                   e.preventDefault();
-                   document.getElementById('compile-btn').click();
-                 }
-                 if ((e.metaKey || e.ctrlKey) && e.key === '.') {
-                   e.preventDefault();
-                   const stepBtn = document.getElementById('step-btn');
-                   if (stepBtn && !stepBtn.disabled) {
-                     stepBtn.click();
-                   }
-                 }
+                 if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); document.getElementById('compile-btn').click(); }
+                 if ((e.metaKey || e.ctrlKey) && e.key === '.') { e.preventDefault(); const stepBtn = document.getElementById('step-btn'); if (stepBtn && !stepBtn.disabled) { stepBtn.click(); } }
                });
              "]))))
 
+;; -------------------------------
+;; File & Compilation Helpers
+;; -------------------------------
 (defn- write-temp-c! ^String [code]
   (let [dir (io/file (System/getProperty "java.io.tmpdir") "stackknack" (str (UUID/randomUUID)))]
     (.mkdirs dir)
@@ -181,7 +138,6 @@
       (.getAbsolutePath cfile))))
 
 (defn- run-stack-script! [^String c-path]
-  ;; Run existing assembler.clj as a child process
   (let [script "./assembler.clj"
         {:keys [in out err] :as p} (conch/proc script c-path)
         out-str (slurp (:out p))
@@ -190,24 +146,10 @@
     {:stdout out-str :stderr err-str}))
 
 (defn- compile-to-executable! [^String c-path]
-  "Compile C to executable for debugging"
   (let [base (str/replace c-path #"\.c$" "")
         exe-path base
         result (shell/sh "gcc" "-g" c-path "-o" exe-path)]
-    (if (zero? (:exit result))
-      exe-path
-      nil)))
-
-(defn- run-gdb-step! [^String exe-path steps]
-  "Run gdb_manual.clj with executable and step count"
-  (let [script "src/gdb_manual.clj"
-        result (shell/sh "clojure" "-M" script exe-path (str steps))]
-    (if (zero? (:exit result))
-      (try
-        (json/parse-string (:out result) true)
-        (catch Exception e
-          {:error (str "Failed to parse GDB output: " (.getMessage e))}))
-      {:error (str "GDB execution failed: " (:err result))})))
+    (if (zero? (:exit result)) exe-path nil)))
 
 (defn- c-to-asm [^String code]
   (let [limit 50000]
@@ -238,22 +180,30 @@
         (catch Exception e
           {:error (str "Server error: " (.getMessage e))})))))
 
+;; -------------------------------
+;; Step Execution (Direct GDB call)
+;; -------------------------------
 (defn- step-execution [session-id]
-  "Step one instruction and return new state"
+  "Step one instruction and return state as JSON."
   (if-let [session (get @sessions session-id)]
     (let [new-step-count (inc (:step-count session))
-          gdb-result (run-gdb-step! (:exe-path session) new-step-count)]
-      (if (:error gdb-result)
-        gdb-result
+          raw-output (gdb/run-gdb-to-step (:exe-path session) new-step-count)
+          result (if raw-output
+                   (gdb/parse-gdb-output raw-output)
+                   {:error "GDB returned no output"})]
+      (if (:error result)
+        result
         (do
           (swap! sessions assoc-in [session-id :step-count] new-step-count)
-          (assoc gdb-result :step-count new-step-count))))
+          (assoc result :step-count new-step-count))))
     {:error "Invalid session"}))
 
+;; -------------------------------
+;; Request Handler
+;; -------------------------------
 (defn handler [req]
   (case [(:request-method req) (:uri req)]
-    [:get "/"]
-    (home-page)
+    [:get "/"] (home-page)
 
     [:post "/compile"]
     (let [code (get-in req [:params "code"])
@@ -268,24 +218,23 @@
           asm (get-in req [:params "asm"])
           action (get-in req [:params "action"])]
       (if (= action "compile")
-        ;; Recompile
         (let [{:keys [asm log error session-id]} (c-to-asm code)]
           (if error
             (home-page code nil error nil nil nil)
             (home-page code asm "Compiled successfully!" session-id 0 nil)))
-        ;; Step
         (let [result (step-execution session-id)]
-          (if (:error result)
-            (home-page code asm (:error result) session-id
-                      (get-in @sessions [session-id :step-count]) nil)
-            (home-page code asm nil session-id
-                      (:step-count result) result)))))
+          (home-page code asm
+                     (:error result)
+                     session-id
+                     (get-in @sessions [session-id :step-count])
+                     result))))
 
+    ;; 404
     (layout "404 - Not Found"
-            [:div {:style "text-align: center; padding: 4rem;"}
+            [:div {:style "text-align:center;padding:4rem;"}
              [:h1 "404"]
              [:p "Page not found"]
-             [:a {:href "/" :style "color: var(--accent-blue);"} "← Back to Home"]])))
+             [:a {:href "/"} "← Back to Home"]])))
 
 (def app
   (-> handler
@@ -293,13 +242,10 @@
       wrap-multipart-params
       wrap-params))
 
+;; -------------------------------
+;; Server Entry Point
+;; -------------------------------
 (defn -main
-  "Start the StackKnack server.
-   Usage:
-     clojure -M -m stackknack.server [mode]
-   where [mode] can be:
-     - \"public\" : bind to 0.0.0.0 (accessible externally)
-     - \"local\"  : bind to localhost (default)"
   [& [mode]]
   (let [port (or (some-> (System/getenv "PORT") Integer/parseInt) 3000)
         host (case (some-> mode str/lower-case)
