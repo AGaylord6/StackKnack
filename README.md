@@ -82,7 +82,7 @@ sudo systemctl restart stackknack.service
 
 * Dockerize the user code (oops)
 * Add reset button
-* Find domain name?
 * Don't refresh assembly for every step
 * Add proper color blocks for each function's frame
-    * Lable local vars + params correctly
+    * Lable local vars + params (registers?) correctly
+* Move registers text block around (only show relevant ones?)

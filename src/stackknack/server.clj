@@ -41,7 +41,11 @@
           start-address (if start-address-str (Long/decode start-address-str) 0)
           stack-memory (:stack-memory stack-data)
           ;; Reverse stack-memory for display so top-of-stack appears first
+          ;; Note: stack-memory[0] corresponds to (frame-address - 8), so the displayed
+          ;; first address should be start-address - 8.
           display-stack (vec (reverse stack-memory))
+          ;; compute corrected start address (first element in stack-memory is start-address - 8)
+          corrected-start-address (- start-address 8)
           registers (:registers stack-data)
           register-mappings (->> frames
                                  (map #(get-in % [:details :saved-register-mappings]))
@@ -63,10 +67,10 @@
               [:div.reg-value v]])]
           [:div.frame-detail "No registers available"]) ]
 
-       (for [i (range (count display-stack))]
+   (for [i (range (count display-stack))]
           ;; Iterate over stack contents and calculate addresses
-         (let [current-address (- start-address (* i 8))
-               address-hex (format "0x%x" current-address)
+     (let [current-address (- corrected-start-address (* i 8))
+       address-hex (format "0x%x" current-address)
                value (get display-stack i)
                register-label (get register-mappings address-hex)]
            [:div.stack-cell
