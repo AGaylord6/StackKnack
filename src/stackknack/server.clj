@@ -44,6 +44,10 @@
                                  (map #(get-in % [:details :saved-register-mappings]))
                                  (reduce merge {}))]
       [:div.stack-visualization
+   ;; Raw JSON dump for debugging / inspection
+   [:details.raw-json
+    [:summary "Raw stack-data JSON"]
+    [:pre (cheshire.core/generate-string stack-data {:pretty true})]]
        (for [i (range (count stack-memory))]
           ;; Iterate over stack contents and calculate addresses
          (let [current-address (- start-address (* i 8))

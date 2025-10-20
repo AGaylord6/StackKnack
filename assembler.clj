@@ -21,7 +21,7 @@
           asm-file (str (str/replace source-file #"\.c$" "") ".s")
           ;; Run gcc with -S to produce assembly
           ;; -g adds debug info
-          result (shell/sh "gcc" "-S" "-fno-asynchronous-unwind-tables" "-fno-dwarf2-cfi-asm" "-fno-unwind-tables" "-g0" "-masm=intel" source-file "-o" asm-file)]
+          result (shell/sh "gcc" "-S" "-fno-asynchronous-unwind-tables" "-fno-dwarf2-cfi-asm" "-fno-unwind-tables" "-fno-stack-protector" "-fno-pic" "-fno-pie" "-fno-ident" "-fno-align-labels" "-fno-align-functions" "-fno-align-loops" "-fno-align-jumps" "-fno-section-anchors" "-fno-exceptions" "-fcf-protection=none" "-g0" "-O0" "-masm=intel" source-file "-o" asm-file)]
 
       (if (zero? (:exit result))
         (println "Assembly generated at:" asm-file)
