@@ -112,7 +112,7 @@
                             :autocomplete "off"
                             :autocorrect "off"
                             :autocapitalize "off"}
-                  (or c-src default-code)]]]
+                  (or c-src default-code)]]
                 [:div.col
                  [:label {:for "asm"} "Assembly Output (.s)"]
                  [:textarea {:id "asm"
