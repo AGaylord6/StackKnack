@@ -40,19 +40,34 @@
           start-address-str (get-in highest-frame [:details :frame-address])
           start-address (if start-address-str (Long/decode start-address-str) 0)
           stack-memory (:stack-memory stack-data)
+          ;; Reverse stack-memory for display so top-of-stack appears first
+          display-stack (vec (reverse stack-memory))
+          registers (:registers stack-data)
           register-mappings (->> frames
                                  (map #(get-in % [:details :saved-register-mappings]))
                                  (reduce merge {}))]
       [:div.stack-visualization
-   ;; Raw JSON dump for debugging / inspection
-   [:details.raw-json
-    [:summary "Raw stack-data JSON"]
-    [:pre (cheshire.core/generate-string stack-data {:pretty true})]]
-       (for [i (range (count stack-memory))]
+       ;; Raw JSON dump for debugging / inspection
+       [:details.raw-json
+        [:summary "Raw stack-data JSON"]
+        [:pre (json/generate-string stack-data {:pretty true})]]
+
+       ;; Registers section
+       [:div.section
+        [:h3 "Registers"]
+        (if (and registers (seq registers))
+          [:div.registers
+           (for [[k v] (sort registers)]
+             [:div.reg-item
+              [:div.reg-name (name k)]
+              [:div.reg-value v]])]
+          [:div.frame-detail "No registers available"]) ]
+
+       (for [i (range (count display-stack))]
           ;; Iterate over stack contents and calculate addresses
          (let [current-address (- start-address (* i 8))
                address-hex (format "0x%x" current-address)
-               value (get stack-memory i)
+               value (get display-stack i)
                register-label (get register-mappings address-hex)]
            [:div.stack-cell
             [:div.address-label address-hex]

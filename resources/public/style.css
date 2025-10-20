@@ -324,6 +324,25 @@ textarea::-webkit-scrollbar-thumb:hover,
   gap: 0.5rem;
 }
 
+/* Raw JSON pretty block: fixed max-height, wrap long lines and allow scroll */
+.raw-json pre {
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap; /* allow wrapping */
+  word-break: break-word;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  padding: 0.75rem;
+  border-radius: 4px;
+}
+
+/* Ensure registers grid scrolls if too tall */
+.registers {
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 0.25rem; /* allow space for scrollbar */
+}
+
 .reg-item {
   display: flex;
   justify-content: space-between;
