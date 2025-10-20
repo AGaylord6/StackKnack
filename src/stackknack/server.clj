@@ -21,6 +21,14 @@
 ;; -------------------------------
 ;; Rendering Helpers
 ;; -------------------------------
+
+;; Load default C code from resource file if available
+(def ^:private default-code
+  (let [res (io/resource "default.c")]
+    (if res
+      (slurp res)
+      "#include <stdio.h>\n\nint add(int a, int b) {\n  return a + b;\n}\n\nint main() {\n  int x = add(2, 40);\n  printf(\"%d\\n\", x);\n  return 0;\n}\n")))
+
 (defn- layout [title & body]
   {:status 200
    :headers {"Content-Type" "text/html; charset=utf-8"}
@@ -41,8 +49,7 @@
           start-address (if start-address-str (Long/decode start-address-str) 0)
           stack-memory (:stack-memory stack-data)
           ;; Reverse stack-memory for display so top-of-stack appears first
-          ;; Note: stack-memory[0] corresponds to (frame-address - 8), so the displayed
-          ;; first address should be start-address - 8.
+          ;; Note: stack-memory[0] corresponds to (frame-address - 8), so the displayed first address should be start-address - 8.
           display-stack (vec (reverse stack-memory))
           ;; compute corrected start address (first element in stack-memory is start-address - 8)
           corrected-start-address (- start-address 8)
@@ -105,7 +112,7 @@
                             :autocomplete "off"
                             :autocorrect "off"
                             :autocapitalize "off"}
-                  (or c-src "#include <stdio.h>\n\nint add(int a, int b) {\n  return a + b;\n}\n\nint main() {\n  int x = add(2, 40);\n  printf(\"%d\\n\", x);\n  return 0;\n}\n")]]
+                  (or c-src default-code)]]]
                 [:div.col
                  [:label {:for "asm"} "Assembly Output (.s)"]
                  [:textarea {:id "asm"
