@@ -24,7 +24,8 @@
 
 ;; Load default C code from resource file if available
 (def ^:private default-code
-  (let [res (io/resource "default.c")]
+  (let [paths ["public/default.c" "default.c" "resources/public/default.c"]
+        res (some io/resource paths)]
     (if res
       (slurp res)
       "#include <stdio.h>\n\nint add(int a, int b) {\n  return a + b;\n}\n\nint main() {\n  int x = add(2, 40);\n  printf(\"%d\\n\", x);\n  return 0;\n}\n")))
@@ -39,6 +40,33 @@
             [:title title]
             (page/include-css "/style.css")]
            [:body body])})
+
+(defn- compute-frame-boundaries
+  "Given frames and the corrected start address, compute which stack cells belong to which frame.
+  Returns a map from stack-cell-index -> frame-index"
+  [frames corrected-start-address stack-cell-count]
+  (let [;; Sort frames by index (deepest first)
+        sorted-frames (sort-by :index frames)
+        ;; Build a map of address -> frame-index
+        frame-ranges (for [frame sorted-frames
+                           :let [frame-addr (Long/decode (get-in frame [:details :frame-address]))
+                                 next-frame (first (filter #(> (:index %) (:index frame)) sorted-frames))
+                                 end-addr (if next-frame
+                                           (Long/decode (get-in next-frame [:details :frame-address]))
+                                           ;; Bottom-most frame extends to the end
+                                           (- corrected-start-address (* 8 stack-cell-count)))]]
+                       {:frame-index (:index frame)
+                        :function (:function frame)
+                        :start-addr frame-addr
+                        :end-addr end-addr})]
+    ;; For each stack cell, determine which frame it belongs to
+    (into {}
+          (for [i (range stack-cell-count)
+                :let [cell-addr (- corrected-start-address (* i 8))
+                      matching-frame (first (filter #(and (<= (:end-addr %) cell-addr)
+                                                          (< cell-addr (:start-addr %)))
+                                                    frame-ranges))]]
+            [i matching-frame]))))
 
 (defn- render-stack-view [stack-data]
   (if stack-data
@@ -56,7 +84,9 @@
           registers (:registers stack-data)
           register-mappings (->> frames
                                  (map #(get-in % [:details :saved-register-mappings]))
-                                 (reduce merge {}))]
+                                 (reduce merge {}))
+          ;; Compute frame boundaries
+          frame-boundaries (compute-frame-boundaries frames corrected-start-address (count display-stack))]
       [:div.stack-visualization
        ;; Raw JSON dump for debugging / inspection
        [:details.raw-json
@@ -74,17 +104,41 @@
               [:div.reg-value v]])]
           [:div.frame-detail "No registers available"]) ]
 
-   (for [i (range (count display-stack))]
-          ;; Iterate over stack contents and calculate addresses
-     (let [current-address (- corrected-start-address (* i 8))
-       address-hex (format "0x%x" current-address)
-               value (get display-stack i)
-               register-label (get register-mappings address-hex)]
-           [:div.stack-cell
-            [:div.address-label address-hex]
-            [:div.value-box value]
-            (when register-label
-              [:div.register-pointer {:data-register register-label} register-label])]))])
+       [:div.section
+        [:h3 "Stack Memory"]
+        [:div.stack-display
+         (for [i (range (count display-stack))
+               :let [current-address (- corrected-start-address (* i 8))
+                     address-hex (format "0x%x" current-address)
+                     value (get display-stack i)
+                     register-label (get register-mappings address-hex)
+                     current-frame (get frame-boundaries i)
+                     next-frame (get frame-boundaries (inc i))
+                     ;; Detect frame boundaries
+                     is-frame-start (and current-frame
+                                        (or (= i 0)
+                                            (not= (:frame-index current-frame)
+                                                  (:frame-index (get frame-boundaries (dec i))))))
+                     is-frame-end (and current-frame
+                                      (or (= i (dec (count display-stack)))
+                                          (not= (:frame-index current-frame)
+                                                (:frame-index next-frame))))]]
+           [:div
+            ;; Frame start label
+            (when is-frame-start
+              [:div.frame-label
+               [:span.frame-function (:function current-frame)]
+               [:span.frame-index (str "Frame #" (:frame-index current-frame))]])
+
+            ;; Stack cell
+            [:div.stack-cell
+             {:class (str "frame-" (:frame-index current-frame)
+                         (when is-frame-start " frame-start")
+                         (when is-frame-end " frame-end"))}
+             [:div.address-label address-hex]
+             [:div.value-box value]
+             (when register-label
+               [:div.register-pointer {:data-register register-label} register-label])]])]]])
     [:div.placeholder "Compile and step through to see stack frames and registers"]))
 
 (defn- home-page

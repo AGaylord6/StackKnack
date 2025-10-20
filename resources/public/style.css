@@ -322,6 +322,9 @@ textarea::-webkit-scrollbar-thumb:hover,
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 0.5rem;
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 0.25rem; /* allow space for scrollbar */
 }
 
 /* Raw JSON pretty block: fixed max-height, wrap long lines and allow scroll */
@@ -334,13 +337,6 @@ textarea::-webkit-scrollbar-thumb:hover,
   border: 1px solid var(--border-color);
   padding: 0.75rem;
   border-radius: 4px;
-}
-
-/* Ensure registers grid scrolls if too tall */
-.registers {
-  max-height: 220px;
-  overflow: auto;
-  padding-right: 0.25rem; /* allow space for scrollbar */
 }
 
 .reg-item {
@@ -402,6 +398,25 @@ textarea::-webkit-scrollbar-thumb:hover,
   font-family: monospace;
 }
 
+.frame-label {
+  background: #e8f4f8;
+  padding: 4px 8px;
+  border: 2px solid #2196F3;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+}
+
+.stack-cell.frame-start {
+  border-top: 2px solid #2196F3;
+}
+
+.stack-cell.frame-end {
+  border-bottom: 2px solid #2196F3;
+}
+
 /* Step Button */
 .step-btn {
   background: var(--accent-green);
@@ -443,6 +458,8 @@ textarea::-webkit-scrollbar-thumb:hover,
   background-color: var(--bg-primary);
   border-radius: 3px;
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  border-left: 2px solid #2196F3;
+  border-right: 2px solid #2196F3;
 }
 
 .address-label {
