@@ -272,12 +272,13 @@
                          (assoc frame :details frame-details)))
                      frames)]
 
-    ;; Store registers globally but don't include in returned state
-    (alter-var-root #'*registers* (constantly registers))
+  ;; Store registers globally and include them in the returned state
+  (alter-var-root #'*registers* (constantly registers))
 
-    {:frame-count (count frames)
-     :frames detailed-frames
-     :stack-memory stack-memory}))
+  {:frame-count (count frames)
+   :frames detailed-frames
+   :stack-memory stack-memory
+   :registers registers}))
 
 ;; -------------------------------
 ;; Interactive Interface
