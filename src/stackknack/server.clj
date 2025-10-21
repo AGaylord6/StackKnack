@@ -146,62 +146,59 @@
               [:div.reg-value v]])]
           [:div.frame-detail "No registers available"]) ]
 
-       [:div.section
-        [:h3 "Stack Memory"]
-        [:div.stack-visualization
-         (if (seq cell-data)
-           (into []
-                 (map (fn [segment]
-                        (let [{:keys [frame frame-index]} (first segment)
-                              colors (get frame-colors frame-index color-default)
-                              border-color (:border colors)
-                              label-bg (:label-bg colors)
-                              text-color (:text colors)
-                              frame-name (or (:function frame) (str "Frame #" (or frame-index "?")))]
-                          [:div.frame-box
-                           {:style {:border (str "2px solid " border-color)
-                                    :border-radius "6px"
-                                    :padding "6px"
-                                    :background "var(--bg-primary)"
-                                    :margin "6px 0"
-                                    :box-shadow "0 1px 3px rgba(15,23,42,0.12)"}}
-                           (when frame
-                             [:div.frame-label
-                              {:style {:background label-bg
-                                       :color text-color
-                                       :border (str "2px solid " border-color)
-                                       :border-radius "4px"
-                                       :padding "4px 8px"
-                                       :font-weight 600
-                                       :display "flex"
-                                       :justify-content "space-between"
-                                       :align-items "center"
-                                       :margin-bottom "6px"}}
-                              [:span.frame-function frame-name]
-                              [:span.frame-index (str "#" (:index frame))]])
-                           [:div.frame-cells
-                            (into []
-                                  (map-indexed
-                                    (fn [seg-idx {:keys [address value register]}]
-                                      (let [total (count segment)
-                                            first? (zero? seg-idx)
-                                            last? (= seg-idx (dec total))
-                                            cell-style (cond-> {:border (str "1px solid " border-color)
-                                                                :border-radius "0"
-                                                                :margin-bottom "3px"}
-                                                          first? (assoc :border-top-left-radius "4px"
-                                                                        :border-top-right-radius "4px")
-                                                          last? (assoc :border-bottom-left-radius "4px"
-                                                                       :border-bottom-right-radius "4px"
-                                                                       :margin-bottom "0")))]
-                                        [:div.stack-cell {:style cell-style}
-                                         [:div.address-label address]
-                                         [:div.value-box value]
-                                         (when register
-                                           [:div.register-pointer {:data-register register} register])]))
-                                    segment)]]))
-                 frame-segments)
-           [[:div.frame-detail "No stack memory captured"]])]]])
+   [:div.section
+    [:h3 "Stack Memory"]
+    (if (seq cell-data)
+      (let [frame-boxes
+            (for [segment frame-segments
+                  :let [{:keys [frame frame-index]} (first segment)
+                        colors (get frame-colors frame-index color-default)
+                        border-color (:border colors)
+                        label-bg (:label-bg colors)
+                        text-color (:text colors)
+                        frame-name (or (:function frame)
+                                       (str "Frame #" (or frame-index "?")))]]
+              [:div.frame-box
+               {:style {:border (str "2px solid " border-color)
+                        :border-radius "6px"
+                        :padding "6px"
+                        :background "var(--bg-primary)"
+                        :margin "6px 0"
+                        :box-shadow "0 1px 3px rgba(15,23,42,0.12)"}}
+               (when frame
+                 [:div.frame-label
+                  {:style {:background label-bg
+                           :color text-color
+                           :border (str "2px solid " border-color)
+                           :border-radius "4px"
+                           :padding "4px 8px"
+                           :font-weight 600
+                           :display "flex"
+                           :justify-content "space-between"
+                           :align-items "center"
+                           :margin-bottom "6px"}}
+                  [:span.frame-function frame-name]
+                  [:span.frame-index (str "#" (:index frame))]])
+               [:div.frame-cells
+                (for [[seg-idx {:keys [address value register]}] (map-indexed vector segment)
+                      :let [total (count segment)
+                            first? (zero? seg-idx)
+                            last? (= seg-idx (dec total))
+                            cell-style (cond-> {:border (str "1px solid " border-color)
+                                                :border-radius "0"
+                                                :margin-bottom "3px"}
+                                              first? (assoc :border-top-left-radius "4px"
+                                                            :border-top-right-radius "4px")
+                                              last? (assoc :border-bottom-left-radius "4px"
+                                                           :border-bottom-right-radius "4px"
+                                                           :margin-bottom "0"))]]
+                  [:div.stack-cell {:style cell-style}
+                   [:div.address-label address]
+                   [:div.value-box value]
+                   (when register
+                     [:div.register-pointer {:data-register register} register])])]])]
+        (into [:div.stack-visualization] frame-boxes))
+      [:div.frame-detail "No stack memory captured"]))]]])
     [:div.placeholder "Compile and step through to see stack frames and registers"]))
 
 (defn- home-page
