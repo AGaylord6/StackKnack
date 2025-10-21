@@ -97,7 +97,6 @@
           display-stack (vec (reverse stack-memory))
           ;; compute corrected start address (first element in stack-memory is start-address - 8)
           corrected-start-address (- start-address 8)
-          registers (:registers stack-data)
           register-mappings (->> frames
                                  (map #(get-in % [:details :saved-register-mappings]))
                                  (reduce merge {}))
@@ -132,17 +131,6 @@
        [:details.raw-json
         [:summary "Raw stack-data JSON"]
         [:pre (json/generate-string stack-data {:pretty true})]]
-
-       ;; Registers section
-       [:div.section
-        [:h3 "Registers"]
-        (if (seq registers)
-          [:div.registers
-           (for [[k v] (sort registers)]
-             [:div.reg-item
-              [:div.reg-name (name k)]
-              [:div.reg-value v]])]
-          [:div.frame-detail "No registers available"])]
        [:div.section
         [:h3 "Stack Memory"]
         (if (seq cell-data)
@@ -194,7 +182,17 @@
                                     (when register
                                       [:div.register-pointer {:data-register register} register])])]])]
             (into [:div.stack-visualization] frame-boxes)))]])
-    [:div.placeholder "Compile and step through to see stack frames and registers"]))
+  [:div.placeholder "Compile and step through to see the call stack."]))
+
+(defn- render-registers-view [stack-data]
+  (let [registers (get stack-data :registers)]
+    (if (seq registers)
+      [:div.registers-grid
+       (for [[k v] (sort registers)]
+         [:div.reg-item
+          [:div.reg-name (name k)]
+          [:div.reg-value v]])]
+      [:div.frame-detail "No registers available"])))
 
 (defn- home-page
   ([] (home-page nil nil nil nil nil nil))
@@ -205,35 +203,11 @@
      (layout "StackKnack"
              [:header
               [:h1 "StackKnack"]
-              [:p "Paste C on the left, get Intel syntax assembly on the right, and step through execution."]]
+              [:p "Write C code, compile to x64 assembly, and step through execution to visualize the call stack and registers."]]
              [:main
               [:form {:method "POST" :action (if session-id "/step" "/compile") :id "main-form"}
                (when session-id
                  [:input {:type "hidden" :name "session-id" :value session-id}])
-               [:div.cols
-                [:div.col
-                 [:label {:for "code"} "C Source Code"]
-                 [:textarea {:name "code"
-                            :id "code"
-                            :wrap "off"
-                            :spellcheck "false"
-                            :placeholder "Enter your C code here..."
-                            :autocomplete "off"
-                            :autocorrect "off"
-                            :autocapitalize "off"}
-                  (or c-src default-code)]]
-                [:div.col
-                 [:label {:for "asm"} "Assembly Output (.s)"]
-                 [:textarea {:id "asm"
-                            :name "asm"
-                            :readonly true
-                            :wrap "off"
-                            :placeholder "// Assembly output will appear here after compilation"}
-                  (or asm-out "")]]
-                [:div.col
-                 [:label {:for "stack"} "Stack & Registers"]
-                 [:div#stack-view.stack-view
-                  (render-stack-view stack-data)]]]
                [:div.actions
                 [:div.action-column
                  [:button {:type "submit"
@@ -261,11 +235,37 @@
                             :class "step-btn disabled-step"
                             :disabled true}
                     "Recompile Required"])]
-                [:div.action-column]]]]
+                [:div.action-column]]
+               [:div.cols
+                [:div.col
+                 [:label {:for "code"} "C Source Code"]
+                 [:textarea {:name "code"
+                            :id "code"
+                            :wrap "off"
+                            :spellcheck "false"
+                            :placeholder "Enter your C code here..."
+                            :autocomplete "off"
+                            :autocorrect "off"
+                            :autocapitalize "off"}
+                  (or c-src default-code)]]
+                [:div.col
+                 [:label {:for "asm"} "Assembly Output (.s)"]
+                 [:textarea {:id "asm"
+                            :name "asm"
+                            :readonly true
+                            :wrap "off"
+                            :placeholder "// Assembly output will appear here after compilation"}
+                  (or asm-out "")]]
+                [:div.col.registers-col
+                 [:label {:for "registers"} "Registers"]
+                 [:div#registers.registers-view
+                  (render-registers-view stack-data)]]
+                [:div.col
+                 [:label {:for "stack"} "Call Stack"]
+                 [:div#stack-view.stack-view
+                  (render-stack-view stack-data)]]]]
               (when (and msg (str/includes? (str msg) "error"))
                 [:p.msg.error msg])
-             [:footer
-              [:p [:strong "Tip:"] " x64 assembly is generated with 'gcc -S -fno-asynchronous-unwind-tables -fno-dwarf2-cfi-asm -fno-unwind-tables -g0 -masm=intel code.c -o assembly.s'"]]
 
              [:script "
                document.getElementById('main-form').addEventListener('submit', function(e) {

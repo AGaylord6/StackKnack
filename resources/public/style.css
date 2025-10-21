@@ -26,7 +26,7 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: auto;
 }
 
 header {
@@ -54,20 +54,19 @@ main {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 form {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  height: 100%;
-  min-height: 0;
+  height: auto;
 }
 
 .cols {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 2fr 2fr 1.2fr 2fr;
   gap: 1rem;
   flex: 1;
   min-height: 0;
@@ -114,7 +113,7 @@ textarea {
   outline: none;
   tab-size: 2;
   overflow-y: auto;
-  min-height: 0;
+  min-height: 36rem;
 }
 
 textarea::placeholder {
@@ -139,8 +138,10 @@ textarea[readonly] {
   gap: 1rem;
   padding: 0.75rem;
   background: var(--bg-secondary);
-  border-top: 1px solid var(--border-color);
-  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  margin-bottom: 1rem;
 }
 
 .action-column {
@@ -225,24 +226,28 @@ footer strong {
 
 /* Scrollbar styling */
 textarea::-webkit-scrollbar,
-.stack-view::-webkit-scrollbar {
+.stack-view::-webkit-scrollbar,
+.registers-view::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 
 textarea::-webkit-scrollbar-track,
-.stack-view::-webkit-scrollbar-track {
+.stack-view::-webkit-scrollbar-track,
+.registers-view::-webkit-scrollbar-track {
   background: var(--bg-secondary);
 }
 
 textarea::-webkit-scrollbar-thumb,
-.stack-view::-webkit-scrollbar-thumb {
+.stack-view::-webkit-scrollbar-thumb,
+.registers-view::-webkit-scrollbar-thumb {
   background: var(--border-color);
   border-radius: 5px;
 }
 
 textarea::-webkit-scrollbar-thumb:hover,
-.stack-view::-webkit-scrollbar-thumb:hover {
+.stack-view::-webkit-scrollbar-thumb:hover,
+.registers-view::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
 }
 
@@ -286,7 +291,21 @@ textarea::-webkit-scrollbar-thumb:hover,
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 0.85rem;
   line-height: 1.6;
-  min-height: 0;
+  min-height: 36rem;
+}
+
+.registers-view {
+  flex: 1;
+  padding: 1rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow-y: auto;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  min-height: 36rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .stack-view .placeholder {
@@ -318,18 +337,19 @@ textarea::-webkit-scrollbar-thumb:hover,
   letter-spacing: 0.5px;
 }
 
-.registers {
+.registers-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 0.5rem;
-  max-height: 220px;
+  max-height: 100%;
   overflow: auto;
-  padding-right: 0.25rem; /* allow space for scrollbar */
+  padding-right: 0.25rem;
+  flex: 1;
 }
 
 /* Raw JSON pretty block: fixed max-height, wrap long lines and allow scroll */
 .raw-json pre {
-  max-height: 240px;
+  max-height: 360px;
   overflow: auto;
   white-space: pre-wrap; /* allow wrapping */
   word-break: break-word;
