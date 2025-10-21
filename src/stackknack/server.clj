@@ -67,8 +67,10 @@
                 {:assignments assignments :order encountered}
                 (let [cell-addr (- corrected-start-address (* cell-idx 8))
                       frame-idx (loop [idx frame-idx]
-                                  (let [next-frame (nth frames-with-addrs (inc idx) nil)]
-                                    (if (and next-frame (<= cell-addr (:addr next-frame)))
+                                  (let [next-frame (nth frames-with-addrs (inc idx) nil)
+                                        threshold (when-let [addr (:addr next-frame)]
+                                                    (- addr 8))]
+                                    (if (and next-frame threshold (<= cell-addr threshold))
                                       (recur (inc idx))
                                       idx)))
                       frame-entry (nth frames-with-addrs frame-idx (last frames-with-addrs))
@@ -200,7 +202,7 @@
    (let [code-changed? (and session-id
                            c-src
                            (not= c-src (get-in @sessions [session-id :c-code])))]
-     (layout "StackKnack — C→Assembly"
+     (layout "StackKnack"
              [:header
               [:h1 "StackKnack"]
               [:p "Paste C on the left, get Intel syntax assembly on the right, and step through execution."]]
