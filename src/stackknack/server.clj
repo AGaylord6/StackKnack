@@ -43,28 +43,30 @@
 
 (defn- compute-frame-boundaries
   "Given frames and the corrected start address, compute which stack cells belong to which frame.
-  Returns a map from stack-cell-index -> frame-index"
+  Returns a map from stack-cell-index -> frame-info"
   [frames corrected-start-address stack-cell-count]
   (let [;; Sort frames by index (deepest first)
         sorted-frames (sort-by :index frames)
-        ;; Build a map of address -> frame-index
+        ;; Build frame ranges - stack grows DOWN, so higher addresses are at the top
         frame-ranges (for [frame sorted-frames
                            :let [frame-addr (Long/decode (get-in frame [:details :frame-address]))
                                  next-frame (first (filter #(> (:index %) (:index frame)) sorted-frames))
-                                 end-addr (if next-frame
-                                           (Long/decode (get-in next-frame [:details :frame-address]))
-                                           ;; Bottom-most frame extends to the end
-                                           (- corrected-start-address (* 8 stack-cell-count)))]]
+                                 ;; Next frame's address is LOWER (stack grows down)
+                                 lower-bound (if next-frame
+                                              (Long/decode (get-in next-frame [:details :frame-address]))
+                                              ;; Bottom-most frame extends to lowest address
+                                              Long/MIN_VALUE)]]
                        {:frame-index (:index frame)
                         :function (:function frame)
-                        :start-addr frame-addr
-                        :end-addr end-addr})]
+                        :frame-addr frame-addr
+                        :lower-bound lower-bound})]
     ;; For each stack cell, determine which frame it belongs to
     (into {}
           (for [i (range stack-cell-count)
                 :let [cell-addr (- corrected-start-address (* i 8))
-                      matching-frame (first (filter #(and (<= (:end-addr %) cell-addr)
-                                                          (< cell-addr (:start-addr %)))
+                      ;; Cell belongs to frame if: lower-bound <= cell-addr < frame-addr
+                      matching-frame (first (filter #(and (< (:lower-bound %) cell-addr)
+                                                          (<= cell-addr (:frame-addr %)))
                                                     frame-ranges))]]
             [i matching-frame]))))
 
@@ -106,7 +108,7 @@
 
        [:div.section
         [:h3 "Stack Memory"]
-        [:div.stack-display
+        [:div.stack-visualization
          (for [i (range (count display-stack))
                :let [current-address (- corrected-start-address (* i 8))
                      address-hex (format "0x%x" current-address)
