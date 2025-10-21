@@ -23,7 +23,7 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.6;
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: auto;
@@ -65,26 +65,20 @@ form {
 }
 
 .cols {
-  display: flex;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: 2fr 2fr 1.2fr 2fr;
   gap: 1rem;
-  flex: 1;
-  min-height: 0;
-  align-items: stretch;
-  overflow-x: auto;
-  padding-bottom: 0.5rem;
+  align-items: start;
 }
 
 .col {
   display: flex;
   flex-direction: column;
-  flex: 1 1 0;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 6px;
   overflow: hidden;
   box-shadow: var(--shadow);
-  min-height: 0;
 }
 
 .col:hover {
@@ -92,7 +86,7 @@ form {
 }
 
 .registers-col {
-  flex: 0 0 320px;
+  width: 100%;
 }
 
 label {
@@ -121,8 +115,7 @@ textarea {
   outline: none;
   tab-size: 2;
   overflow-y: auto;
-  min-height: 48rem;
-  height: 48rem;
+  min-height: 32rem;
 }
 
 textarea::placeholder {
@@ -296,12 +289,11 @@ textarea::-webkit-scrollbar-thumb:hover,
   padding: 1rem;
   background: var(--bg-primary);
   color: var(--text-primary);
-  overflow-y: auto;
+  overflow-y: visible;
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 0.85rem;
   line-height: 1.6;
-  min-height: 48rem;
-  height: 48rem;
+  min-height: 32rem;
 }
 
 .registers-view {
@@ -313,8 +305,8 @@ textarea::-webkit-scrollbar-thumb:hover,
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 0.85rem;
   line-height: 1.6;
-  min-height: 48rem;
-  height: 48rem;
+  min-height: 24rem;
+  max-height: 40rem;
   display: flex;
   flex-direction: column;
 }
@@ -353,7 +345,6 @@ textarea::-webkit-scrollbar-thumb:hover,
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 0.5rem;
   max-height: 100%;
-  overflow: auto;
   padding-right: 0.25rem;
   flex: 1;
 }
