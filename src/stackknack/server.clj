@@ -191,8 +191,7 @@
                                     [:div.value-box value]
                                     (when register
                                       [:div.register-pointer {:data-register register} register])])]])]
-            (into [:div.stack-visualization] frame-boxes)
-          [:div.frame-detail "No stack memory captured"])]]))
+            (into [:div.stack-visualization] frame-boxes)))]])
     [:div.placeholder "Compile and step through to see stack frames and registers"]))
 
 (defn- home-page
