@@ -1,15 +1,12 @@
 #include <stdio.h>
 
-int recurse(int n) {
+int level_2(int n) {
     return n + 1;
 }
 
 int level_1(int a) {
     int c = a * 2;
-    for (int i = 0; i < 3; i++) {
-        c = c + recurse(i);
-    }
-    return c;
+    return c + level_2(a);
 }
 
 int main() {

@@ -185,10 +185,14 @@
   [:div.placeholder "Compile and step through to see the call stack."]))
 
 (defn- render-registers-view [stack-data]
-  (let [registers (get stack-data :registers)]
-    (if (seq registers)
+  (let [registers (get stack-data :registers)
+        filtered (->> registers
+                      (seq)
+                      (filter (fn [[k _]] (str/starts-with? (name k) "r")))
+                      (sort-by (comp name first)))]
+    (if (seq filtered)
       [:div.registers-grid
-       (for [[k v] (sort registers)]
+       (for [[k v] filtered]
          [:div.reg-item
           [:div.reg-name (name k)]
           [:div.reg-value v]])]
@@ -202,8 +206,7 @@
                            (not= c-src (get-in @sessions [session-id :c-code])))]
      (layout "StackKnack"
              [:header
-              [:h1 "StackKnack"]
-              [:p "Write C code, compile to x64 assembly, and step through execution to visualize the call stack and registers."]]
+              [:h3 "StackKnack"]]
              [:main
               [:form {:method "POST" :action (if session-id "/step" "/compile") :id "main-form"}
                (when session-id
