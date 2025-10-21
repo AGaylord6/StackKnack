@@ -265,7 +265,7 @@
                  [:div#stack-view.stack-view
                   (render-stack-view stack-data)]]]]
               (when (and msg (str/includes? (str msg) "error"))
-                [:p.msg.error msg])
+                [:p.msg.error msg])]
 
              [:script "
                document.getElementById('main-form').addEventListener('submit', function(e) {

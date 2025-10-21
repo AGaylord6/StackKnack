@@ -65,16 +65,20 @@ form {
 }
 
 .cols {
-  display: grid;
-  grid-template-columns: 2fr 2fr 1.2fr 2fr;
+  display: flex;
+  flex-wrap: nowrap;
   gap: 1rem;
   flex: 1;
   min-height: 0;
+  align-items: stretch;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
 }
 
 .col {
   display: flex;
   flex-direction: column;
+  flex: 1 1 0;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 6px;
@@ -85,6 +89,10 @@ form {
 
 .col:hover {
   border-color: var(--accent-blue);
+}
+
+.registers-col {
+  flex: 0 0 320px;
 }
 
 label {
@@ -113,7 +121,8 @@ textarea {
   outline: none;
   tab-size: 2;
   overflow-y: auto;
-  min-height: 36rem;
+  min-height: 48rem;
+  height: 48rem;
 }
 
 textarea::placeholder {
@@ -291,7 +300,8 @@ textarea::-webkit-scrollbar-thumb:hover,
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 0.85rem;
   line-height: 1.6;
-  min-height: 36rem;
+  min-height: 48rem;
+  height: 48rem;
 }
 
 .registers-view {
@@ -303,7 +313,8 @@ textarea::-webkit-scrollbar-thumb:hover,
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 0.85rem;
   line-height: 1.6;
-  min-height: 36rem;
+  min-height: 48rem;
+  height: 48rem;
   display: flex;
   flex-direction: column;
 }
