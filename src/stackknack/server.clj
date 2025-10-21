@@ -257,7 +257,7 @@
                             :name "asm"
                             :readonly true
                             :wrap "off"
-                            :placeholder "// Assembly output will appear here after compilation"}
+                            :placeholder "// Assembly output will appear here"}
                   (or asm-out "")]]
                 [:div.col.registers-col
                  [:label {:for "registers"} "Registers"]
