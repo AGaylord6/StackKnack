@@ -359,38 +359,6 @@ textarea::-webkit-scrollbar-thumb:hover,
   font-family: monospace;
 }
 
-.frame {
-  background: var(--bg-primary);
-  border-left: 3px solid var(--accent-blue);
-  border: 1px solid var(--border-color);
-  border-left: 3px solid var(--accent-blue);
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
-  border-radius: 4px;
-}
-
-.frame:last-child {
-  margin-bottom: 0;
-}
-
-.frame-header {
-  color: var(--text-primary);
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-
-.frame-loc {
-  color: var(--text-secondary);
-  font-weight: normal;
-  font-size: 0.85em;
-}
-
-.frame-args {
-  color: var(--text-secondary);
-  font-size: 0.85em;
-  margin-top: 0.25rem;
-}
-
 .frame-detail {
   color: var(--text-secondary);
   font-size: 0.8em;
@@ -399,22 +367,11 @@ textarea::-webkit-scrollbar-thumb:hover,
 }
 
 .frame-label {
-  background: #e8f4f8;
-  padding: 4px 8px;
-  border: 2px solid #2196F3;
-  border-bottom: none;
-  border-radius: 4px 4px 0 0;
-  font-weight: bold;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-weight: 600;
   display: flex;
   justify-content: space-between;
-}
-
-.stack-cell.frame-start {
-  border-top: 2px solid #2196F3;
-}
-
-.stack-cell.frame-end {
-  border-bottom: 2px solid #2196F3;
+  align-items: center;
 }
 
 /* Step Button */
@@ -443,7 +400,7 @@ textarea::-webkit-scrollbar-thumb:hover,
 .stack-visualization {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0.5rem;
   padding: 0.5rem;
   background-color: var(--bg-tertiary);
   border-radius: 4px;
@@ -454,12 +411,11 @@ textarea::-webkit-scrollbar-thumb:hover,
   grid-template-columns: 100px 1fr 80px;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.25rem 0.5rem;
+  padding: 0.5rem;
   background-color: var(--bg-primary);
-  border-radius: 3px;
+  border-radius: 4px;
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  border-left: 2px solid #2196F3;
-  border-right: 2px solid #2196F3;
+  border: 1px solid var(--border-color);
 }
 
 .address-label {
@@ -503,89 +459,14 @@ textarea::-webkit-scrollbar-thumb:hover,
   background-color: #fbeee6;
 }
 
-
-/* Frame boundary styles */
-.stack-visualization .frame-label {
-  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
-  color: white;
-  padding: 6px 12px;
-  margin-top: 8px;
-  border: 2px solid #2196F3;
-  border-bottom: none;
-  border-radius: 4px 4px 0 0;
+.frame-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.stack-visualization .frame-function {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-weight: bold;
-}
-
-.stack-visualization .frame-index {
-  opacity: 0.9;
-  font-size: 0.8rem;
-  font-weight: bold;
-}
-
-.stack-cell.frame-start {
-  border-top: 2px solid #2196F3;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-  margin-top: 0;
-}
-
-.stack-cell.frame-end {
-  border-bottom: 2px solid #2196F3;
-  border-bottom-left-radius: 4px;
-  border-bottom-right-radius: 4px;
-  margin-bottom: 0;
-}
-
-/* Different colors for different frames */
-.stack-cell.frame-0 {
-  border-left-color: #4CAF50;
-  border-right-color: #4CAF50;
-}
-
-.stack-cell.frame-0.frame-start {
-  border-top-color: #4CAF50;
-}
-
-.stack-cell.frame-0.frame-end {
-  border-bottom-color: #4CAF50;
-}
-
-.frame-0 + .frame-label {
-  background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);
-  border-color: #4CAF50;
-}
-
-.stack-cell.frame-1 {
-  border-left-color: #2196F3;
-  border-right-color: #2196F3;
-}
-
-.stack-cell.frame-1.frame-start {
-  border-top-color: #2196F3;
-}
-
-.stack-cell.frame-1.frame-end {
-  border-bottom-color: #2196F3;
-}
-
-.stack-cell.frame-2 {
-  border-left-color: #FF9800;
-  border-right-color: #FF9800;
-}
-
-.stack-cell.frame-2.frame-start {
-  border-top-color: #FF9800;
-}
-
-.stack-cell.frame-2.frame-end {
-  border-bottom-color: #FF9800;
-}
-
-.frame-2 + .frame-label {
-  background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
-  border-color: #FF9800;
+.frame-cells {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }

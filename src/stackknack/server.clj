@@ -11,7 +11,8 @@
     [me.raynes.conch.low-level :as conch]
     [cheshire.core :as json]
     [gdb-manual :as gdb])
-  (:import (java.util UUID)))
+  (:import (java.util UUID)
+           (java.util.concurrent ThreadLocalRandom)))
 
 ;; -------------------------------
 ;; Session State
@@ -42,33 +43,44 @@
            [:body body])})
 
 (defn- compute-frame-boundaries
-  "Given frames and the corrected start address, compute which stack cells belong to which frame.
-  Returns a map from stack-cell-index -> frame-info"
+  "Assign each stack cell to a frame based on frame addresses.
+  Returns {:cell->frame {index frame} :frame-order [frame ...]}"
   [frames corrected-start-address stack-cell-count]
-  (let [;; Sort frames by index (deepest first)
-        sorted-frames (sort-by :index frames)
-        ;; Build frame ranges - stack grows DOWN, so higher addresses are at the top
-        frame-ranges (for [frame sorted-frames
-                           :let [frame-addr (Long/decode (get-in frame [:details :frame-address]))
-                                 next-frame (first (filter #(> (:index %) (:index frame)) sorted-frames))
-                                 ;; Next frame's address is LOWER (stack grows down)
-                                 lower-bound (if next-frame
-                                              (Long/decode (get-in next-frame [:details :frame-address]))
-                                              ;; Bottom-most frame extends to lowest address
-                                              Long/MIN_VALUE)]]
-                       {:frame-index (:index frame)
-                        :function (:function frame)
-                        :frame-addr frame-addr
-                        :lower-bound lower-bound})]
-    ;; For each stack cell, determine which frame it belongs to
-    (into {}
-          (for [i (range stack-cell-count)
-                :let [cell-addr (- corrected-start-address (* i 8))
-                      ;; Cell belongs to frame if: lower-bound <= cell-addr < frame-addr
-                      matching-frame (first (filter #(and (< (:lower-bound %) cell-addr)
-                                                          (<= cell-addr (:frame-addr %)))
-                                                    frame-ranges))]]
-            [i matching-frame]))))
+  (letfn [(decode-long [s]
+            (when-let [value s]
+              (try
+                (Long/decode value)
+                (catch NumberFormatException _ nil))))]
+    (let [frames-with-addrs (->> frames
+                                 (map (fn [frame]
+                                        (when-let [addr (decode-long (get-in frame [:details :frame-address]))]
+                                          {:frame frame :addr addr})))
+                                 (remove nil?)
+                                 (sort-by :addr >))
+          cell->frame
+          (if (and (seq frames-with-addrs) (pos? stack-cell-count))
+            (loop [cell-idx 0
+                   frame-idx 0
+                   assignments {}
+                   encountered []]
+              (if (= cell-idx stack-cell-count)
+                {:assignments assignments :order encountered}
+                (let [cell-addr (- corrected-start-address (* cell-idx 8))
+                      frame-idx (loop [idx frame-idx]
+                                  (let [next-frame (nth frames-with-addrs (inc idx) nil)]
+                                    (if (and next-frame (<= cell-addr (:addr next-frame)))
+                                      (recur (inc idx))
+                                      idx)))
+                      frame-entry (nth frames-with-addrs frame-idx (last frames-with-addrs))
+                      frame (:frame frame-entry)
+                      assignments (assoc assignments cell-idx frame)
+                      encountered (if (= frame (last encountered))
+                                    encountered
+                                    (conj encountered frame))]
+                  (recur (inc cell-idx) frame-idx assignments encountered))))
+            {:assignments {} :order []})]
+      {:cell->frame (:assignments cell->frame)
+       :frame-order (:order cell->frame)})))
 
 (defn- render-stack-view [stack-data]
   (if stack-data
@@ -88,7 +100,35 @@
                                  (map #(get-in % [:details :saved-register-mappings]))
                                  (reduce merge {}))
           ;; Compute frame boundaries
-          frame-boundaries (compute-frame-boundaries frames corrected-start-address (count display-stack))]
+          {:keys [cell->frame frame-order]} (compute-frame-boundaries frames corrected-start-address (count display-stack))
+          rng (ThreadLocalRandom/current)
+          color-default {:border "#7e8690" :label-bg "#e4e9ef" :text "#0f172a"}
+          frame-colors (reduce (fn [acc frame]
+                                  (let [idx (:index frame)
+                                        hue (.nextInt rng 360)
+                                        border (format "hsl(%d, 70%%, 45%%)" hue)
+                                        label-bg (format "hsl(%d, 85%%, 90%%)" hue)]
+                                    (assoc acc idx {:border border
+                                                    :label-bg label-bg
+                                                    :text "#0f172a"})))
+                                {}
+                                frame-order)
+          cell-data (vec
+                      (for [i (range (count display-stack))]
+                        (let [current-address (- corrected-start-address (* i 8))
+                              address-hex (format "0x%x" current-address)
+                              value (get display-stack i)
+                              register-label (get register-mappings address-hex)
+                              frame (get cell->frame i)]
+                          {:idx i
+                           :address address-hex
+                           :value value
+                           :register register-label
+                           :frame frame
+                           :frame-index (:index frame)})))
+          frame-segments (->> cell-data
+                               (partition-by :frame-index)
+                               (remove empty?))]
       [:div.stack-visualization
        ;; Raw JSON dump for debugging / inspection
        [:details.raw-json
@@ -109,38 +149,59 @@
        [:div.section
         [:h3 "Stack Memory"]
         [:div.stack-visualization
-         (for [i (range (count display-stack))
-               :let [current-address (- corrected-start-address (* i 8))
-                     address-hex (format "0x%x" current-address)
-                     value (get display-stack i)
-                     register-label (get register-mappings address-hex)
-                     current-frame (get frame-boundaries i)
-                     next-frame (get frame-boundaries (inc i))
-                     ;; Detect frame boundaries
-                     is-frame-start (and current-frame
-                                        (or (= i 0)
-                                            (not= (:frame-index current-frame)
-                                                  (:frame-index (get frame-boundaries (dec i))))))
-                     is-frame-end (and current-frame
-                                      (or (= i (dec (count display-stack)))
-                                          (not= (:frame-index current-frame)
-                                                (:frame-index next-frame))))]]
-           [:div
-            ;; Frame start label
-            (when is-frame-start
-              [:div.frame-label
-               [:span.frame-function (:function current-frame)]
-               [:span.frame-index (str "Frame #" (:frame-index current-frame))]])
-
-            ;; Stack cell
-            [:div.stack-cell
-             {:class (str "frame-" (:frame-index current-frame)
-                         (when is-frame-start " frame-start")
-                         (when is-frame-end " frame-end"))}
-             [:div.address-label address-hex]
-             [:div.value-box value]
-             (when register-label
-               [:div.register-pointer {:data-register register-label} register-label])]])]]])
+         (if (seq cell-data)
+           (into []
+                 (map (fn [segment]
+                        (let [{:keys [frame frame-index]} (first segment)
+                              colors (get frame-colors frame-index color-default)
+                              border-color (:border colors)
+                              label-bg (:label-bg colors)
+                              text-color (:text colors)
+                              frame-name (or (:function frame) (str "Frame #" (or frame-index "?")))]
+                          [:div.frame-box
+                           {:style {:border (str "2px solid " border-color)
+                                    :border-radius "6px"
+                                    :padding "6px"
+                                    :background "var(--bg-primary)"
+                                    :margin "6px 0"
+                                    :box-shadow "0 1px 3px rgba(15,23,42,0.12)"}}
+                           (when frame
+                             [:div.frame-label
+                              {:style {:background label-bg
+                                       :color text-color
+                                       :border (str "2px solid " border-color)
+                                       :border-radius "4px"
+                                       :padding "4px 8px"
+                                       :font-weight 600
+                                       :display "flex"
+                                       :justify-content "space-between"
+                                       :align-items "center"
+                                       :margin-bottom "6px"}}
+                              [:span.frame-function frame-name]
+                              [:span.frame-index (str "#" (:index frame))]])
+                           [:div.frame-cells
+                            (into []
+                                  (map-indexed
+                                    (fn [seg-idx {:keys [address value register]}]
+                                      (let [total (count segment)
+                                            first? (zero? seg-idx)
+                                            last? (= seg-idx (dec total))
+                                            cell-style (cond-> {:border (str "1px solid " border-color)
+                                                                :border-radius "0"
+                                                                :margin-bottom "3px"}
+                                                          first? (assoc :border-top-left-radius "4px"
+                                                                        :border-top-right-radius "4px")
+                                                          last? (assoc :border-bottom-left-radius "4px"
+                                                                       :border-bottom-right-radius "4px"
+                                                                       :margin-bottom "0")))]
+                                        [:div.stack-cell {:style cell-style}
+                                         [:div.address-label address]
+                                         [:div.value-box value]
+                                         (when register
+                                           [:div.register-pointer {:data-register register} register])]))
+                                    segment)]]))
+                 frame-segments)
+           [[:div.frame-detail "No stack memory captured"]])]]])
     [:div.placeholder "Compile and step through to see stack frames and registers"]))
 
 (defn- home-page
